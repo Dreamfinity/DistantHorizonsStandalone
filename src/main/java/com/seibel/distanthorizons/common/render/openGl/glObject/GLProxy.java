@@ -174,7 +174,7 @@ public class GLProxy
 		
 		if (Config.Client.Advanced.Debugging.OpenGl.overrideVanillaGLLogger.get())
 		{
-			GLUtil.setupDebugMessageCallback(new PrintStream(new GLMessageOutputStream(GLProxy::logMessage, this.vanillaDebugMessageBuilder), true));
+			//GLUtil.setupDebugMessageCallback(new PrintStream(new GLMessageOutputStream(GLProxy::logMessage, this.vanillaDebugMessageBuilder), true));
 		}
 		
 		
