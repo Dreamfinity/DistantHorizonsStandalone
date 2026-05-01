@@ -64,6 +64,22 @@ public class ForgeClientProxy implements AbstractModInitializer.IEventProxy {
         return e.world;
     }
 
+    private static boolean IsUsableClientLevel(World level) {
+        if (level == null || !level.isRemote || !(level instanceof WorldClient)) {
+            return false;
+        }
+
+        // Some mods create WorldClient subclasses as temporary render/cache worlds.
+        // They fire WorldEvent.Load from the WorldClient constructor, but they are not
+        // the actual playable client level and should not get a DH level.
+        if (level.getClass() != WorldClient.class) {
+            LOGGER.debug("Skipping fake client level [" + level.getClass().getName() + "].");
+            return false;
+        }
+
+        return true;
+    }
+
     @Override
     public void registerEvents() {
         MinecraftForge.EVENT_BUS.register(this);
@@ -85,7 +101,7 @@ public class ForgeClientProxy implements AbstractModInitializer.IEventProxy {
         LOGGER.info("level load");
 
         World level = event.world;
-        if (!(level instanceof WorldClient)) {
+        if (!IsUsableClientLevel(level)) {
             return;
         }
 
@@ -100,7 +116,7 @@ public class ForgeClientProxy implements AbstractModInitializer.IEventProxy {
         LOGGER.info("level unload");
 
         World level = event.world;
-        if (!(level instanceof WorldClient)) {
+        if (!IsUsableClientLevel(level)) {
             return;
         }
 
@@ -138,7 +154,7 @@ public class ForgeClientProxy implements AbstractModInitializer.IEventProxy {
         }
 
         World level = chunk.worldObj;
-        if (level == null || !level.isRemote) {
+        if (!IsUsableClientLevel(level)) {
             return;
         }
 
