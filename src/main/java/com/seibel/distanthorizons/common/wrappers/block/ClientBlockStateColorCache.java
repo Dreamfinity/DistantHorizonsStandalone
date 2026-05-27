@@ -419,7 +419,8 @@ public class ClientBlockStateColorCache {
         // per biome for each block state.
         // Avoids (potentially) expensive colorMultiplier om some Block subclasses
         int biomeId = (biomeWrapper.biome != null) ? biomeWrapper.biome.biomeID : -1;
-        // Read the volatile field once so clearBiomeColorCache() can't null it between the null check and getOrDefault().
+        // Read the volatile field once so clearBiomeColorCache() can't null it between the null check and
+        // getOrDefault().
         ConcurrentHashMap<Integer, Integer> biomeColorCache = this.biomeColorCache;
         if (biomeColorCache != null) {
             int cached = biomeColorCache.getOrDefault(biomeId, Integer.MIN_VALUE);
