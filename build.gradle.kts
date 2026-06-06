@@ -47,3 +47,12 @@ plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin> {
         }
     }
 }
+
+tasks.withType<org.gradle.api.plugins.quality.Checkstyle>().configureEach {
+    exclude(
+        "**/com/seibel/distanthorizons/core/**",
+        "**/com/seibel/distanthorizons/api/**",
+        "**/com/seibel/distanthorizons/coreapi/**",
+        "**/com/seibel/distanthorizons/common/render/**",
+    )
+}
