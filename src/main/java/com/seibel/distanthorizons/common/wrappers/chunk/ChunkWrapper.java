@@ -14,7 +14,7 @@
  */
 package com.seibel.distanthorizons.common.wrappers.chunk;
 
-import java.util.*;
+import java.util.ArrayList;
 
 import net.minecraft.block.Block;
 import net.minecraft.world.biome.BiomeGenBase;

@@ -15,10 +15,12 @@
 
 package com.seibel.distanthorizons.common.wrappers.block;
 
-import java.awt.*;
+import java.awt.Color;
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.minecraft.block.Block;
