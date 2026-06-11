@@ -122,8 +122,6 @@ public class GlDhFarFadeRenderer implements IDhFarFadeRenderer
 	{
 		try
 		{
-			//profiler.push("Fade Generate");
-			
 			this.init();
 			
 			// resize the framebuffer if necessary
@@ -138,10 +136,8 @@ public class GlDhFarFadeRenderer implements IDhFarFadeRenderer
 			
 			
 			GlDhFarFadeShader.INSTANCE.frameBuffer = this.fadeFramebuffer;
-			GlDhFarFadeShader.INSTANCE.setProjectionMatrix(renderParams.mcModelViewMatrix, renderParams.mcProjectionMatrix);
+			GlDhFarFadeShader.INSTANCE.setProjectionMatrix(renderParams);
 			GlDhFarFadeShader.INSTANCE.render(renderParams);
-			
-			//profiler.popPush("Fade Apply");
 			
 			GlDhFarFadeApplyShader.INSTANCE.fadeTexture = this.fadeTexture;
 			GlDhFarFadeApplyShader.INSTANCE.readFramebuffer = GlDhFarFadeShader.INSTANCE.frameBuffer;
@@ -151,10 +147,6 @@ public class GlDhFarFadeRenderer implements IDhFarFadeRenderer
 		catch (Exception e)
 		{
 			LOGGER.error("Unexpected error during fade render, error: ["+e.getMessage()+"].", e);
-		}
-		finally
-		{
-			//profiler.pop();
 		}
 	}
 	

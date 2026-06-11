@@ -29,7 +29,6 @@ import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.common.render.openGl.util.GlAbstractShaderRenderer;
 import com.seibel.distanthorizons.core.render.RenderParams;
 import com.seibel.distanthorizons.core.util.RenderUtil;
-import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import org.lwjgl.opengl.GL32;
 
@@ -43,8 +42,8 @@ public class GlDhVanillaFadeShader extends GlAbstractShaderRenderer
 	
 	public int frameBuffer = -1;
 	
-	private Mat4f inverseMcMvmProjMatrix;
-	private Mat4f inverseDhMvmProjMatrix;
+	private DhApiMat4f inverseMcMvmProjMatrix;
+	private DhApiMat4f inverseDhMvmProjMatrix;
 	private float levelMaxHeight;
 	
 	
@@ -136,21 +135,10 @@ public class GlDhVanillaFadeShader extends GlAbstractShaderRenderer
 		this.shader.setUniform(this.uOnlyRenderLods, Config.Client.Advanced.Debugging.lodOnlyMode.get());
 	}
 	
-	public void setProjectionMatrix(DhApiMat4f mcModelViewMatrix, DhApiMat4f mcProjectionMatrix)
+	public void setProjectionMatrix(RenderParams renderParams)
 	{
-		Mat4f inverseMcModelViewProjectionMatrix = new Mat4f(mcProjectionMatrix);
-		inverseMcModelViewProjectionMatrix.multiply(mcModelViewMatrix);
-		inverseMcModelViewProjectionMatrix.invert();
-		this.inverseMcMvmProjMatrix = inverseMcModelViewProjectionMatrix;
-		
-		
-		Mat4f dhProjectionMatrix = RenderUtil.createLodProjectionMatrix(mcProjectionMatrix);
-		Mat4f dhModelViewMatrix = RenderUtil.createLodModelViewMatrix(mcModelViewMatrix);
-		
-		Mat4f inverseDhModelViewProjectionMatrix = new Mat4f(dhProjectionMatrix);
-		inverseDhModelViewProjectionMatrix.multiply(dhModelViewMatrix);
-		inverseDhModelViewProjectionMatrix.invert();
-		this.inverseDhMvmProjMatrix = inverseDhModelViewProjectionMatrix;
+		this.inverseMcMvmProjMatrix = renderParams.mcInverseMvmProjectionMatrix;
+		this.inverseDhMvmProjMatrix = renderParams.dhInverseMvmProjectionMatrix;
 	}
 	public void setLevelMaxHeight(int levelMaxHeight) { this.levelMaxHeight = levelMaxHeight; }
 	
@@ -185,7 +173,7 @@ public class GlDhVanillaFadeShader extends GlAbstractShaderRenderer
 		GLMC.disableBlend();
 		
 		GLMC.glActiveTexture(GL32.GL_TEXTURE0);
-		GLMC.glBindTexture(MC_RENDER.getDepthTextureId());
+		GLMC.glBindTexture(MC_RENDER.getGlDepthTextureId());
 		GL32.glUniform1i(this.uMcDepthTexture, 0);
 		
 		GLMC.glActiveTexture(GL32.GL_TEXTURE1);
@@ -193,7 +181,7 @@ public class GlDhVanillaFadeShader extends GlAbstractShaderRenderer
 		GL32.glUniform1i(this.uDhDepthTexture, 1);
 		
 		GLMC.glActiveTexture(GL32.GL_TEXTURE2);
-		GLMC.glBindTexture(MC_RENDER.getColorTextureId());
+		GLMC.glBindTexture(MC_RENDER.getGlColorTextureId());
 		GL32.glUniform1i(this.uCombinedMcDhColorTexture, 2);
 		
 		GLMC.glActiveTexture(GL32.GL_TEXTURE3);

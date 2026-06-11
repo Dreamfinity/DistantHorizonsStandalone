@@ -28,7 +28,6 @@ import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.common.render.openGl.util.GlAbstractShaderRenderer;
 import com.seibel.distanthorizons.core.render.RenderParams;
 import com.seibel.distanthorizons.core.util.RenderUtil;
-import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import org.lwjgl.opengl.GL32;
 
@@ -42,7 +41,7 @@ public class GlDhFarFadeShader extends GlAbstractShaderRenderer
 	
 	public int frameBuffer = -1;
 	
-	private Mat4f inverseDhMvmProjMatrix;
+	private DhApiMat4f inverseDhMvmProjMatrix;
 	
 	
 	// Uniforms
@@ -110,15 +109,9 @@ public class GlDhFarFadeShader extends GlAbstractShaderRenderer
 		
 	}
 	
-	public void setProjectionMatrix(DhApiMat4f mcModelViewMatrix, DhApiMat4f mcProjectionMatrix)
+	public void setProjectionMatrix(RenderParams renderParams)
 	{
-		Mat4f dhProjectionMatrix = RenderUtil.createLodProjectionMatrix(mcProjectionMatrix);
-		Mat4f dhModelViewMatrix = RenderUtil.createLodModelViewMatrix(mcModelViewMatrix);
-		
-		Mat4f inverseDhModelViewProjectionMatrix = new Mat4f(dhProjectionMatrix);
-		inverseDhModelViewProjectionMatrix.multiply(dhModelViewMatrix);
-		inverseDhModelViewProjectionMatrix.invert();
-		this.inverseDhMvmProjMatrix = inverseDhModelViewProjectionMatrix;
+		this.inverseDhMvmProjMatrix = renderParams.dhInverseMvmProjectionMatrix;
 	}
 	
 	
@@ -153,7 +146,7 @@ public class GlDhFarFadeShader extends GlAbstractShaderRenderer
 		GL32.glUniform1i(this.uDhDepthTexture, 0);
 		
 		GLMC.glActiveTexture(GL32.GL_TEXTURE1);
-		GLMC.glBindTexture(MC_RENDER.getColorTextureId());
+		GLMC.glBindTexture(MC_RENDER.getGlColorTextureId());
 		GL32.glUniform1i(this.uMcColorTexture, 1);
 		
 		GLMC.glActiveTexture(GL32.GL_TEXTURE2);

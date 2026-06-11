@@ -10,10 +10,10 @@ import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBoxGroupShad
 import com.seibel.distanthorizons.common.render.openGl.glObject.shader.GlShaderProgram;
 import com.seibel.distanthorizons.common.render.openGl.glObject.vertexAttribute.GlAbstractVertexAttribute;
 import com.seibel.distanthorizons.common.render.openGl.glObject.vertexAttribute.GlVertexPointer;
-import com.seibel.distanthorizons.common.wrappers.minecraft.LightMapWrapper;
+import com.seibel.distanthorizons.common.wrappers.misc.LightMapWrapper;
 import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.util.math.Mat4f;
-import com.seibel.distanthorizons.core.util.math.Vec3f;
+import com.seibel.distanthorizons.core.util.math.DhMat4f;
+import com.seibel.distanthorizons.core.util.math.DhVec3f;
 
 public class GlGenericObjectShaderProgram extends GlShaderProgram implements IDhApiGenericObjectShaderProgram
 {
@@ -21,37 +21,37 @@ public class GlGenericObjectShaderProgram extends GlShaderProgram implements IDh
 	public static final String VERTEX_SHADER_DIRECT_PATH = "assets/distanthorizons/shaders/generic/gl/direct/vert.vert";
 	public static final String FRAGMENT_SHADER_INSTANCED_PATH = "assets/distanthorizons/shaders/generic/gl/instanced/frag.frag";
 	public static final String FRAGMENT_SHADER_DIRECT_PATH = "assets/distanthorizons/shaders/generic/gl/direct/frag.frag";
-
+	
 	public final GlAbstractVertexAttribute va;
-
-
+	
+	
 	// shader uniforms
 	private final int directShaderTransformUniform;
 	private final int directShaderColorUniform;
-
+	
 	private final int instancedShaderOffsetChunkUniform;
 	private final int instancedShaderOffsetSubChunkUniform;
 	private final int instancedShaderCameraChunkPosUniform;
 	private final int instancedShaderCameraSubChunkPosUniform;
 	private final int instancedShaderProjectionModelViewMatrixUniform;
-
+	
 	private final int lightMapUniform;
 	private final int skyLightUniform;
 	private final int blockLightUniform;
-
+	
 	private final int northShadingUniform;
 	private final int southShadingUniform;
 	private final int eastShadingUniform;
 	private final int westShadingUniform;
 	private final int topShadingUniform;
 	private final int bottomShadingUniform;
-
-
-
+	
+	
+	
 	//=============//
 	// constructor //
 	//=============//
-
+	
 	public GlGenericObjectShaderProgram(boolean useInstancedRendering)
 	{
 		super(
@@ -59,22 +59,22 @@ public class GlGenericObjectShaderProgram extends GlShaderProgram implements IDh
 				useInstancedRendering ? FRAGMENT_SHADER_INSTANCED_PATH : FRAGMENT_SHADER_DIRECT_PATH,
 				"vPosition"
 		);
-
+		
 		this.va = GlAbstractVertexAttribute.create();
 		this.va.bind();
 		// Pos
 		this.va.setVertexAttribute(0, 0, GlVertexPointer.addVec3Pointer(false));
 		this.va.completeAndCheck(Float.BYTES * 3);
-
+		
 		this.directShaderTransformUniform = this.tryGetUniformLocation("uTransform");
 		this.directShaderColorUniform = this.tryGetUniformLocation("uColor");
-
+		
 		this.instancedShaderOffsetChunkUniform = this.tryGetUniformLocation("uOffsetChunk");
 		this.instancedShaderOffsetSubChunkUniform = this.tryGetUniformLocation("uOffsetSubChunk");
 		this.instancedShaderCameraChunkPosUniform = this.tryGetUniformLocation("uCameraPosChunk");
 		this.instancedShaderCameraSubChunkPosUniform = this.tryGetUniformLocation("uCameraPosSubChunk");
 		this.instancedShaderProjectionModelViewMatrixUniform = this.tryGetUniformLocation("uProjectionMvm");
-
+		
 		this.lightMapUniform = this.getUniformLocation("uLightMap");
 		this.skyLightUniform = this.getUniformLocation("uSkyLight");
 		this.blockLightUniform = this.getUniformLocation("uBlockLight");
@@ -84,15 +84,15 @@ public class GlGenericObjectShaderProgram extends GlShaderProgram implements IDh
 		this.westShadingUniform = this.getUniformLocation("uWestShading");
 		this.topShadingUniform = this.getUniformLocation("uTopShading");
 		this.bottomShadingUniform = this.getUniformLocation("uBottomShading");
-
+		
 	}
-
-
-
+	
+	
+	
 	//=========//
 	// methods //
 	//=========//
-
+	
 	@Override
 	public void bind(DhApiRenderParam renderEventParam)
 	{
@@ -105,17 +105,17 @@ public class GlGenericObjectShaderProgram extends GlShaderProgram implements IDh
 		super.unbind();
 		this.va.unbind();
 	}
-
+	
 	@Override
 	public void free()
 	{
 		this.va.free();
 		super.free();
 	}
-
+	
 	@Override
 	public void bindVertexBuffer(int vbo) { this.va.bindBufferToAllBindingPoints(vbo); }
-
+	
 	@Override
 	public void fillIndirectUniformData(
 			DhApiRenderParam renderParameters,
@@ -123,14 +123,14 @@ public class GlGenericObjectShaderProgram extends GlShaderProgram implements IDh
 			DhApiVec3d camPos
 		)
 	{
-		Mat4f projectionMvmMatrix = new Mat4f(renderParameters.dhProjectionMatrix);
+		DhMat4f projectionMvmMatrix = new DhMat4f(renderParameters.dhProjectionMatrix);
 		projectionMvmMatrix.multiply(renderParameters.dhModelViewMatrix);
-
+		
 		super.bind();
-
-
-
-
+		
+		
+		
+		
 		this.setUniform(this.instancedShaderOffsetChunkUniform,
 				new DhApiVec3i(
 						LodUtil.getChunkPosFromDouble(boxGroup.getOriginBlockPos().x),
@@ -138,12 +138,12 @@ public class GlGenericObjectShaderProgram extends GlShaderProgram implements IDh
 						LodUtil.getChunkPosFromDouble(boxGroup.getOriginBlockPos().z)
 				));
 		this.setUniform(this.instancedShaderOffsetSubChunkUniform,
-				new Vec3f(
+				new DhVec3f(
 						LodUtil.getSubChunkPosFromDouble(boxGroup.getOriginBlockPos().x),
 						LodUtil.getSubChunkPosFromDouble(boxGroup.getOriginBlockPos().y),
 						LodUtil.getSubChunkPosFromDouble(boxGroup.getOriginBlockPos().z)
 				));
-
+		
 		this.setUniform(this.instancedShaderCameraChunkPosUniform,
 				new DhApiVec3i(
 						LodUtil.getChunkPosFromDouble(camPos.x),
@@ -151,81 +151,81 @@ public class GlGenericObjectShaderProgram extends GlShaderProgram implements IDh
 						LodUtil.getChunkPosFromDouble(camPos.z)
 				));
 		this.setUniform(this.instancedShaderCameraSubChunkPosUniform,
-				new Vec3f(
+				new DhVec3f(
 						LodUtil.getSubChunkPosFromDouble(camPos.x),
 						LodUtil.getSubChunkPosFromDouble(camPos.y),
 						LodUtil.getSubChunkPosFromDouble(camPos.z)
 				));
-
+		
 		this.setUniform(this.instancedShaderProjectionModelViewMatrixUniform, projectionMvmMatrix);
-
+		
 		this.setUniform(this.lightMapUniform, LightMapWrapper.GL_BOUND_INDEX);
 		this.setUniform(this.skyLightUniform, boxGroup.getSkyLight());
 		this.setUniform(this.blockLightUniform, boxGroup.getBlockLight());
-
-
+		
+		
 		this.setUniform(this.northShadingUniform, shading.north);
 		this.setUniform(this.southShadingUniform, shading.south);
 		this.setUniform(this.eastShadingUniform, shading.east);
 		this.setUniform(this.westShadingUniform, shading.west);
 		this.setUniform(this.topShadingUniform, shading.top);
 		this.setUniform(this.bottomShadingUniform, shading.bottom);
-
-
+		
+		
 	}
-
-
-	@Override
+	
+	
+	@Override 
 	public void fillSharedDirectUniformData(
-			DhApiRenderParam renderParameters,
-			DhApiRenderableBoxGroupShading shading, IDhApiRenderableBoxGroup boxGroup,
+			DhApiRenderParam renderParameters, 
+			DhApiRenderableBoxGroupShading shading, IDhApiRenderableBoxGroup boxGroup, 
 			DhApiVec3d camPos)
 	{
-
+		
 		this.setUniform(this.lightMapUniform, LightMapWrapper.GL_BOUND_INDEX);
 		this.setUniform(this.skyLightUniform, boxGroup.getSkyLight());
 		this.setUniform(this.blockLightUniform, boxGroup.getBlockLight());
-
-
+		
+		
 		this.setUniform(this.northShadingUniform, shading.north);
 		this.setUniform(this.southShadingUniform, shading.south);
 		this.setUniform(this.eastShadingUniform, shading.east);
 		this.setUniform(this.westShadingUniform, shading.west);
 		this.setUniform(this.topShadingUniform, shading.top);
 		this.setUniform(this.bottomShadingUniform, shading.bottom);
-
+		
 	}
-
+	
 	public void fillDirectUniformData(
 			DhApiRenderParam renderParameters,
-			IDhApiRenderableBoxGroup boxGroup, DhApiRenderableBox box,
+			IDhApiRenderableBoxGroup boxGroup, DhApiRenderableBox box, 
 			DhApiVec3d camPos)
 	{
-		Mat4f projectionMvmMatrix = new Mat4f(renderParameters.dhProjectionMatrix);
+		DhMat4f projectionMvmMatrix = new DhMat4f(renderParameters.dhProjectionMatrix);
 		projectionMvmMatrix.multiply(renderParameters.dhModelViewMatrix);
-
-		Mat4f boxTransform = Mat4f.createTranslateMatrix(
+		
+		DhMat4f boxTransform = DhMat4f.createTranslateMatrix(
 				(float) (box.minPos.x + boxGroup.getOriginBlockPos().x - camPos.x),
 				(float) (box.minPos.y + boxGroup.getOriginBlockPos().y - camPos.y),
 				(float) (box.minPos.z + boxGroup.getOriginBlockPos().z - camPos.z));
-		boxTransform.multiply(Mat4f.createScaleMatrix(
+		boxTransform.multiply(DhMat4f.createScaleMatrix(
 				(float) (box.maxPos.x - box.minPos.x),
 				(float) (box.maxPos.y - box.minPos.y),
 				(float) (box.maxPos.z - box.minPos.z)));
 		projectionMvmMatrix.multiply(boxTransform);
 		this.setUniform(this.directShaderTransformUniform, projectionMvmMatrix);
-
+		
 		this.setUniform(this.directShaderColorUniform, box.color);
-
+		
 	}
-
-
-
+	
+	
+	
 	@Override
 	public int getId() { return this.id; }
-
+	
 	/** The base DH render program should always render */
 	@Override
 	public boolean overrideThisFrame() { return true; }
-
+	
 }
