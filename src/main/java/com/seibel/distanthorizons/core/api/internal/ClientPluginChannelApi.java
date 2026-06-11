@@ -10,13 +10,13 @@ import com.seibel.distanthorizons.core.network.event.internal.CloseInternalEvent
 import com.seibel.distanthorizons.core.network.messages.base.LevelInitMessage;
 import com.seibel.distanthorizons.core.network.session.NetworkSession;
 import com.seibel.distanthorizons.core.render.RenderThreadTaskHandler;
+import com.seibel.distanthorizons.core.world.AbstractDhWorld;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
-import java.util.function.Consumer;
 
 /**
  * This class is used to manage the level keys.
@@ -30,9 +30,6 @@ public class ClientPluginChannelApi
 	private static final IMinecraftClientWrapper MC = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
 	private static final IKeyedClientLevelManager KEYED_CLIENT_LEVEL_MANAGER = SingletonInjector.INSTANCE.get(IKeyedClientLevelManager.class);
 	
-	private final Consumer<IServerKeyedClientLevel> levelLoadHandler;
-	private final Consumer<IClientLevelWrapper> levelUnloadHandler;
-	
 	@Nullable
 	public NetworkSession networkSession;
 	
@@ -42,10 +39,8 @@ public class ClientPluginChannelApi
 	// constructor //
 	//=============//
 	
-	public ClientPluginChannelApi(Consumer<IServerKeyedClientLevel> levelLoadHandler, Consumer<IClientLevelWrapper> levelUnloadHandler)
+	public ClientPluginChannelApi()
 	{
-		this.levelLoadHandler = levelLoadHandler;
-		this.levelUnloadHandler = levelUnloadHandler;
 	}
 	
 	
@@ -88,38 +83,27 @@ public class ClientPluginChannelApi
 			throw new IllegalArgumentException("Server sent invalid level key.");
 		}
 		
-		LOGGER.info("Server level key received: [" + msg.levelKey + "].");
+		LOGGER.info("Level init received for [" + msg.dimensionResourceLocation + "]: server key [" + msg.serverKey + "], level key [" + msg.levelKey + "]");
 		
 		RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("ClientPluginChannelApi onLevelInitMessage", () -> 
 		{
 			IClientLevelWrapper clientLevel = MC.getWrappedClientLevel(true);
-			IServerKeyedClientLevel existingKeyedClientLevel = KEYED_CLIENT_LEVEL_MANAGER.getServerKeyedLevel();
-
-			if (existingKeyedClientLevel != null)
-			{
-				if (!existingKeyedClientLevel.getServerLevelKey().equals(msg.levelKey))
-				{
-					LOGGER.info("Unloading previous level with key: [" + existingKeyedClientLevel.getServerLevelKey() + "].");
-					this.levelUnloadHandler.accept(existingKeyedClientLevel);
-				}
-				else
-				{
-					LOGGER.info("Level key matches the previous level key, ignoring the message.");
-				}
-			}
-			else
-			{
-				LOGGER.info("Unloading non-keyed level: [" + clientLevel.getDhIdentifier() + "].");
-				this.levelUnloadHandler.accept(clientLevel);
-			}
+			IServerKeyedClientLevel existingKeyedClientLevel = KEYED_CLIENT_LEVEL_MANAGER.getServerKeyedLevel(clientLevel);
 			
 			if (existingKeyedClientLevel == null
-					|| !existingKeyedClientLevel.getServerKey().equals(msg.serverKey)
-					|| !existingKeyedClientLevel.getServerLevelKey().equals(msg.levelKey))
+				|| !existingKeyedClientLevel.getServerKey().equals(msg.serverKey)
+				|| !existingKeyedClientLevel.getServerLevelKey().equals(msg.levelKey))
 			{
 				LOGGER.info("Loading level with key: [" + msg.levelKey + "].");
-				IServerKeyedClientLevel keyedLevel = KEYED_CLIENT_LEVEL_MANAGER.setServerKeyedLevel(clientLevel, msg.serverKey, msg.levelKey);
-				this.levelLoadHandler.accept(keyedLevel);
+				
+				IServerKeyedClientLevel keyedLevel = KEYED_CLIENT_LEVEL_MANAGER.setServerKeyedLevel(clientLevel, msg.dimensionResourceLocation, msg.serverKey, msg.levelKey);
+				
+				if (keyedLevel != null) {
+					AbstractDhWorld world = SharedApi.getAbstractDhWorld();
+					if (world != null) {
+						world.getOrLoadLevel(keyedLevel);
+					}
+				}
 			}
 		});
 	}

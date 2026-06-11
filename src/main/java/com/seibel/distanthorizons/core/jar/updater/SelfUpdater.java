@@ -28,16 +28,13 @@ import com.seibel.distanthorizons.core.jar.installer.GitlabGetter;
 import com.seibel.distanthorizons.core.jar.installer.ModrinthGetter;
 import com.seibel.distanthorizons.core.jar.installer.WebDownloader;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.logging.f3.F3Screen;
-import com.seibel.distanthorizons.core.util.NativeDialogUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.IVersionConstants;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.coreapi.util.StringUtil;
 import com.seibel.distanthorizons.coreapi.util.jar.DeleteOnUnlock;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
-import javax.swing.*;
-import java.awt.*;
 import java.io.*;
 import java.net.URLEncoder;
 import java.nio.file.Files;
@@ -59,11 +56,13 @@ public class SelfUpdater
 {
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
+	private static final IMinecraftClientWrapper MC_CLIENT = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
+	private static final IVersionConstants VERSION_CONSTANTS = SingletonInjector.INSTANCE.get(IVersionConstants.class);
+	
+	private static final String MC_VERSION = VERSION_CONSTANTS.getMinecraftVersion();
+	
 	/** As we cannot delete(or replace) the jar while the mod is running, we just have this to delete it once the game closes */
 	public static boolean deleteOldJarOnJvmShutdown = false;
-	
-	private static String currentJarSha = "";
-	private static String mcVersion = SingletonInjector.INSTANCE.get(IVersionConstants.class).getMinecraftVersion();
 	
 	public static File newFileLocation;
 	
@@ -76,8 +75,64 @@ public class SelfUpdater
 	 */
 	public static boolean onStart()
 	{
-		LOGGER.info("Checking for Distant Horizons update");
+		if (!Config.Client.Advanced.AutoUpdater.enableAutoUpdater.get())
+		{
+			LOGGER.info("Distant Horizons auto update disabled.");
+			return false;
+		}
 		
+		
+		try
+		{
+			EDhApiUpdateBranch updateBranch = EDhApiUpdateBranch.convertAutoToStableOrNightly(Config.Client.Advanced.AutoUpdater.updateBranch.get());
+			
+			LOGGER.info("Checking for Distant Horizons ["+updateBranch+"] update for MC ["+MC_VERSION+"]...");
+			
+			if (updateBranch == EDhApiUpdateBranch.STABLE)
+			{
+				return onStableStart();
+			}
+			else
+			{
+				return onNightlyStart();
+			}
+		}
+		catch (Exception e) // Shouldn't be needed, but just in case
+		{
+			LOGGER.warn("Unexpected updater startup error: ["+e.getMessage()+"].", e);
+			return false;
+		}
+	}
+	private static boolean onStableStart()
+	{
+		// Some init stuff
+		// We use sha1 to check the version as our versioning system is different to the one on modrinth
+		if (!ModrinthGetter.init())
+		{
+			LOGGER.warn("Unable to find any stable builds, auto update will be unavailable.");
+			return false;
+		}
+		if (!ModrinthGetter.mcVersions.contains(MC_VERSION))
+		{
+			LOGGER.warn("Minecraft version ["+ MC_VERSION +"] is not findable on Modrinth, only findable versions are ["+ StringUtil.join(", ", ModrinthGetter.mcVersions) +"]");
+			return false;
+		}
+		
+		try
+		{
+			newFileLocation = JarUtils.jarFile
+				.getParentFile().toPath()
+				.resolve("update")
+				.resolve(ModInfo.NAME + "-" + ModrinthGetter.getLatestNameForVersion(MC_VERSION) + "-" + MC_VERSION + ".jar")
+				.toFile();
+		}
+		catch (Exception e)
+		{
+			LOGGER.warn("Unable to get file location to download auto updated file to.", e);
+			return false;
+		}
+		
+		String currentJarSha;
 		try
 		{
 			currentJarSha = JarUtils.getFileChecksum(MessageDigest.getInstance("SHA"), JarUtils.jarFile);
@@ -88,45 +143,8 @@ public class SelfUpdater
 			return false;
 		}
 		
-		boolean returnValue = false;
-		try
-		{
-			EDhApiUpdateBranch updateBranch = EDhApiUpdateBranch.convertAutoToStableOrNightly(Config.Client.Advanced.AutoUpdater.updateBranch.get());
-			returnValue = (updateBranch == EDhApiUpdateBranch.STABLE) ? onStableStart() : onNightlyStart();
-		}
-		catch (Exception e) // Shouldn't be needed, but just in case
-		{
-			LOGGER.warn("Unexpected updater startup error: ["+e.getMessage()+"].", e);
-		}
-		return returnValue;
-	}
-	private static boolean onStableStart()
-	{
-		// Some init stuff
-		// We use sha1 to check the version as our versioning system is different to the one on modrinth
-		if (!ModrinthGetter.init())
-		{
-			LOGGER.warn("Unable to find any nightly build pipelines, auto update will be unavailable.");
-			return false;
-		}
-		if (!ModrinthGetter.mcVersions.contains(mcVersion))
-		{
-			LOGGER.warn("Minecraft version ["+ mcVersion +"] is not findable on Modrinth, only findable versions are ["+ StringUtil.join(", ", ModrinthGetter.mcVersions) +"]");
-			return false;
-		}
-		
-		try
-		{
-			newFileLocation = JarUtils.jarFile.getParentFile().toPath().resolve("update").resolve(ModInfo.NAME + "-" + ModrinthGetter.getLatestNameForVersion(mcVersion) + "-" + mcVersion + ".jar").toFile();
-		}
-		catch (Exception e)
-		{
-			LOGGER.warn("Unable to get file location to download auto updated file to.", e);
-			return false;
-		}
-		
 		// Check the sha's of both our stuff
-		if (currentJarSha.equals(ModrinthGetter.getLatestShaForVersion(mcVersion)))
+		if (currentJarSha.equals(ModrinthGetter.getLatestShaForVersion(MC_VERSION)))
 		{
 			LOGGER.info("Distant Horizons already up to date.");
 			return false;
@@ -138,21 +156,23 @@ public class SelfUpdater
 		}
 		
 		
-		LOGGER.info("New version (" + ModrinthGetter.getLatestNameForVersion(mcVersion) + ") of Distant Horizons is available");
+		LOGGER.info("New version (" + ModrinthGetter.getLatestNameForVersion(MC_VERSION) + ") of Distant Horizons is available");
 		if (Config.Client.Advanced.AutoUpdater.enableSilentUpdates.get())
 		{
 			// Auto-update mod
-			updateMod(mcVersion, newFileLocation);
+			updateMod(MC_VERSION, newFileLocation);
 			return false;
 		}
 		else
 		{
-			LOGGER.info("Download link: " + ModrinthGetter.getLatestDownloadForVersion(mcVersion));
+			LOGGER.info("Download link: " + ModrinthGetter.getLatestDownloadForVersion(MC_VERSION));
 		}
 		return true;
 	}
 	private static boolean onNightlyStart()
 	{
+		LOGGER.info("Checking for Distant Horizons Nightly update...");
+		
 		if (GitlabGetter.INSTANCE.projectPipelines.size() == 0)
 		{
 			LOGGER.info("Unable to find any nightly build pipelines, auto update will be unavailable.");
@@ -172,9 +192,9 @@ public class SelfUpdater
 			return false;
 		}
 		
-		if (!GitlabGetter.INSTANCE.getDownloads(pipeline.get("id")).containsKey(mcVersion))
+		if (!GitlabGetter.INSTANCE.getDownloads(pipeline.get("id")).containsKey(MC_VERSION))
 		{
-			LOGGER.warn("Minecraft version ["+ mcVersion +"] is not findable on Gitlab, findable versions are ["+ StringUtil.join(", ", GitlabGetter.INSTANCE.getDownloads(pipeline.get("id")).keySet().toArray()) +"].");
+			LOGGER.warn("Minecraft version ["+ MC_VERSION +"] is not findable on Gitlab, findable versions are ["+ StringUtil.join(", ", GitlabGetter.INSTANCE.getDownloads(pipeline.get("id")).keySet().toArray()) +"].");
 			return false;
 		}
 		
@@ -201,12 +221,12 @@ public class SelfUpdater
 		if (Config.Client.Advanced.AutoUpdater.enableSilentUpdates.get())
 		{
 			// Auto-update mod
-			updateMod(mcVersion, newFileLocation);
+			updateMod(MC_VERSION, newFileLocation);
 			return false;
 		}
 		else
 		{
-			LOGGER.info("Download link: " + GitlabGetter.getLatestForVersion(mcVersion));
+			LOGGER.info("Download link: " + GitlabGetter.getLatestForVersion(MC_VERSION));
 		}
 		return true;
 	}
@@ -264,7 +284,7 @@ public class SelfUpdater
 			{
 				try
 				{
-					NativeDialogUtil.showDialog(ModInfo.READABLE_NAME, successMessage, "ok", "info");
+					MC_CLIENT.showDialog(ModInfo.READABLE_NAME, successMessage, "ok", "info");
 				}
 				catch (Exception ignore) { }
 			}).start();
@@ -287,7 +307,7 @@ public class SelfUpdater
 			LOGGER.error(failMessage, e);
 			try
 			{
-				NativeDialogUtil.showDialog(ModInfo.READABLE_NAME, failMessage, "ok", "error");
+				MC_CLIENT.showDialog(ModInfo.READABLE_NAME, failMessage, "ok", "error");
 			}
 			catch (Exception ignore) { }
 			
@@ -386,7 +406,7 @@ public class SelfUpdater
 			{
 				try
 				{
-					NativeDialogUtil.showDialog(ModInfo.READABLE_NAME, successMessage, "ok", "info");
+					MC_CLIENT.showDialog(ModInfo.READABLE_NAME, successMessage, "ok", "info");
 				}
 				catch (Exception ignore) { }
 			}).start();
@@ -424,7 +444,7 @@ public class SelfUpdater
 			LOGGER.error(failMessage, e);
 			try
 			{
-				NativeDialogUtil.showDialog(ModInfo.READABLE_NAME, failMessage, "ok", "error");
+				MC_CLIENT.showDialog(ModInfo.READABLE_NAME, failMessage, "ok", "error");
 			}
 			catch (Exception ignore) { }
 			

@@ -28,6 +28,7 @@ import com.seibel.distanthorizons.core.jar.ModJarInfo;
 import com.seibel.distanthorizons.core.level.IDhClientLevel;
 import com.seibel.distanthorizons.core.level.IDhLevel;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.render.RenderThreadTaskHandler;
 import com.seibel.distanthorizons.core.util.objects.pooling.PhantomArrayListPool;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.render.RenderBufferHandler;
@@ -127,7 +128,7 @@ public class F3Screen
 				messageList.add("LOD Pos: "+y+detailLevel+"*"+posX+","+posZ+cf);
 				
 				AbstractDhRenderApiDefinition renderApiDef = SingletonInjector.INSTANCE.get(AbstractDhRenderApiDefinition.class);
-				messageList.add("Rendering API: "+a+renderApiDef.getApiName()+cf);
+				messageList.add("Rendering API: "+a+renderApiDef.getEngineName()+cf);
 			}
 			messageList.add("");
 		}
@@ -146,6 +147,13 @@ public class F3Screen
 			//messageList.add(PriorityTaskPicker.Executor.getThreadPoolStatString("Cleanup", ThreadPoolUtil.getCleanupExecutor()));
 			//messageList.add(PriorityTaskPicker.Executor.getThreadPoolStatString("Beacon Culling", ThreadPoolUtil.getBeaconCullingExecutor()));
 			//messageList.add(PriorityTaskPicker.Executor.getThreadPoolStatString("Migration", ThreadPoolUtil.getFullDataMigrationExecutor()));
+			messageList.add("");
+		}
+		
+		// render thread tasks
+		if (Config.Client.Advanced.Debugging.F3Screen.showRenderThreadTasks.get())
+		{
+			RenderThreadTaskHandler.INSTANCE.addDebugMenuStringsToList(messageList);
 			messageList.add("");
 		}
 		

@@ -86,16 +86,20 @@ public class DhApiGraphicsConfig implements IDhApiGraphicsConfig
 	{ return new DhApiConfigValue<EDhApiHorizontalQuality, EDhApiHorizontalQuality>(Config.Client.Advanced.Graphics.Quality.horizontalQuality); }
 	
 	@Override
+	public IDhApiConfigValue<Boolean> useCameraPositionForQualityDropOff()
+	{ return new DhApiConfigValue<Boolean, Boolean>(Config.Client.Advanced.Graphics.Quality.useCameraPositionForQualityDropOff); }
+	
+	@Override
 	public IDhApiConfigValue<EDhApiTransparency> transparency()
 	{ return new DhApiConfigValue<EDhApiTransparency, EDhApiTransparency>(Config.Client.Advanced.Graphics.Quality.transparency); }
 	
 	@Override
 	public IDhApiConfigValue<EDhApiBlocksToAvoid> blocksToAvoid()
-	{ return new DhApiConfigValue<EDhApiBlocksToAvoid, EDhApiBlocksToAvoid>(Config.Client.Advanced.Graphics.Quality.blocksToIgnore); }
+	{ return new DhApiConfigValue<EDhApiBlocksToAvoid, EDhApiBlocksToAvoid>(Config.Client.Advanced.Graphics.Culling.blocksToIgnore); }
 	
 	@Override
 	public IDhApiConfigValue<Boolean> tintWithAvoidedBlocks()
-	{ return new DhApiConfigValue<Boolean, Boolean>(Config.Client.Advanced.Graphics.Quality.tintWithAvoidedBlocks); }
+	{ return new DhApiConfigValue<Boolean, Boolean>(Config.Client.Advanced.Graphics.Culling.tintWithAvoidedBlocks); }
 	
 	@Override
 	public IDhApiConfigValue<Integer> getBiomeBlending()

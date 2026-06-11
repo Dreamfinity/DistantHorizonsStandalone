@@ -20,22 +20,22 @@
 package com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.level.IDhClientLevel;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import com.seibel.distanthorizons.core.render.RenderThreadTaskHandler;
-import com.seibel.distanthorizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.util.ExceptionUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
+import com.seibel.distanthorizons.core.wrapperInterfaces.render.AbstractDhRenderApiDefinition;
 import com.seibel.distanthorizons.core.wrapperInterfaces.render.objects.ILodContainerUniformBufferWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.render.renderPass.IDhTerrainRenderer;
 import com.seibel.distanthorizons.core.wrapperInterfaces.render.objects.IVertexBufferWrapper;
-import org.lwjgl.system.MemoryUtil;
+import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Java representation of one or more OpenGL buffers for rendering.
@@ -47,6 +47,7 @@ public class LodBufferContainer implements AutoCloseable
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
 	private static final IWrapperFactory WRAPPER_FACTORY = SingletonInjector.INSTANCE.get(IWrapperFactory.class);
+	private static final AbstractDhRenderApiDefinition RENDER_DEF = SingletonInjector.INSTANCE.get(AbstractDhRenderApiDefinition.class);
 	
 	
 	/** the position closest to minimum X/Z infinity and the level's lowest Y */
@@ -55,12 +56,10 @@ public class LodBufferContainer implements AutoCloseable
 	
 	public boolean buffersUploaded = false;
 	
-	public IVertexBufferWrapper[] vbos;
-	public IVertexBufferWrapper[] vbosTransparent;
+	public IVertexBufferWrapper[] vboOpaqueWrappers;
+	public IVertexBufferWrapper[] vboTransparentWrappers;
 	
 	public ILodContainerUniformBufferWrapper uniformContainer = WRAPPER_FACTORY.createLodContainerUniformWrapper();
-	
-	private final AtomicReference<CompletableFuture<LodBufferContainer>> uploadFutureRef = new AtomicReference<>(null);
 	
 	
 	
@@ -69,14 +68,12 @@ public class LodBufferContainer implements AutoCloseable
 	//==============//
 	//region
 	
-	public LodBufferContainer(long pos, DhBlockPos minCornerBlockPos)
+	private LodBufferContainer(long pos, DhBlockPos minCornerBlockPos)
 	{
 		this.pos = pos;
 		this.minCornerBlockPos = minCornerBlockPos;
-		this.vbos = new IVertexBufferWrapper[0];
-		this.vbosTransparent = new IVertexBufferWrapper[0];
-		
-		this.uniformContainer.createUniformData(this);
+		this.vboOpaqueWrappers = new IVertexBufferWrapper[0];
+		this.vboTransparentWrappers = new IVertexBufferWrapper[0];
 	}
 	
 	//endregion
@@ -89,94 +86,149 @@ public class LodBufferContainer implements AutoCloseable
 	//region
 	
 	/** Should be run on a DH thread. */
-	public synchronized CompletableFuture<LodBufferContainer> makeAndUploadBuffersAsync(LodQuadBuilder builder)
+	public static CompletableFuture<LodBufferContainer> tryMakeAndUploadBuffersAsync(
+		long pos, IDhClientLevel clientLevel,
+		ArrayList<ByteBuffer> opaqueBuffers,
+		ArrayList<ByteBuffer> transparentBuffers
+	)
 	{
-		// separate variable to prevent race condition when checking null
-		CompletableFuture<LodBufferContainer> oldFuture = this.uploadFutureRef.get();
-		if (oldFuture != null)
-		{
-			// upload already in process
-			return oldFuture;
-		}
-		
 		// new upload needed
 		CompletableFuture<LodBufferContainer> future = new CompletableFuture<>();
-		future.handle((lodBufferContainer, throwable) -> 
-		{
-			if (!this.uploadFutureRef.compareAndSet(future, null))
-			{
-				LOGGER.warn("upload future ref changed for pos ["+DhSectionPos.toString(this.pos)+"].");
-			}
-			
-			return null;
-		});
-		
-		if (!this.uploadFutureRef.compareAndSet(null, future))
-		{
-			oldFuture = this.uploadFutureRef.get();
-			LodUtil.assertTrue(oldFuture != null, "Concurrency error");
-			return oldFuture;
-		}
 		
 		
 		
-		// make the buffers
-		ArrayList<ByteBuffer> opaqueBuffers = builder.makeOpaqueVertexBuffers();
-		ArrayList<ByteBuffer> transparentBuffers = builder.makeTransparentVertexBuffers();
+		//================//
+		// create buffers //
+		//================//
+		//region
 		
-		this.vbos = resizeBufferArray(this.vbos, opaqueBuffers.size());
-		this.vbosTransparent = resizeBufferArray(this.vbosTransparent, transparentBuffers.size());
+		DhBlockPos minCornerBlockPos = new DhBlockPos(
+			DhSectionPos.getMinCornerBlockX(pos),
+			clientLevel.getLevelWrapper().getMinHeight(),
+			DhSectionPos.getMinCornerBlockZ(pos));
+		LodBufferContainer bufferContainer = new LodBufferContainer(pos, minCornerBlockPos);
+		
+		// update arrays to contain buffers
+		bufferContainer.vboOpaqueWrappers = resizeWrapperArray(bufferContainer.vboOpaqueWrappers, opaqueBuffers.size());
+		bufferContainer.vboTransparentWrappers = resizeWrapperArray(bufferContainer.vboTransparentWrappers, transparentBuffers.size());
+		
+		// create CPU index buffers if needed.
+		// Mac requires separate IBO objects for each VBO when using OpenGL,
+		// all other OS's can share a single IBO for quicker loading times
+		boolean useSingleIbo = RENDER_DEF.useSingleIbo();
+		@Nullable ArrayList<ByteBuffer> opaqueIndexBuffers = useSingleIbo ? null : bufferContainer.createIndexBuffers(opaqueBuffers);
+		@Nullable ArrayList<ByteBuffer> transparentIndexBuffers = useSingleIbo ? null : bufferContainer.createIndexBuffers(transparentBuffers);
+		
+		//endregion
 		
 		
-		// upload on MC's render thread
-		RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("LodBufferContainer Upload", () ->
+		
+		//=============//
+		// create VBOs //
+		//=============//
+		//region	
+		
+		CompletableFuture<Void> createFuture = new CompletableFuture<Void>();
+		RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("LodBufferContainer Setup", () ->
 		{
 			try
 			{
 				// skip this event if requested
-				if (Thread.interrupted() 
+				if (Thread.interrupted()
 					|| future.isCancelled())
 				{
 					throw new InterruptedException();
 				}
 				
-				// upload on the render thread
-				uploadBuffers(this.vbos, opaqueBuffers);
-				uploadBuffers(this.vbosTransparent, transparentBuffers);
-				this.buffersUploaded = true;
+				createBufferWrappers(bufferContainer.vboOpaqueWrappers, opaqueBuffers);
+				createBufferWrappers(bufferContainer.vboTransparentWrappers, transparentBuffers);
 				
-				// success
-				future.complete(this);
-			}
-			catch (InterruptedException ignore) 
-			{
-				future.complete(this);
+				createFuture.complete(null);
 			}
 			catch (Exception e)
 			{
-				LOGGER.error("Unexpected issue uploading buffer ["+this.minCornerBlockPos +"], error: ["+e.getMessage()+"].", e);
-				
-				future.completeExceptionally(e);
-			}
-			finally
-			{
-				// all the buffers must be manually freed to prevent memory leaks
-				
-				for (ByteBuffer buffer : opaqueBuffers)
+				if (!ExceptionUtil.isShutdownException(e))
 				{
-					MemoryUtil.memFree(buffer);
+					LOGGER.error("Unexpected issue creating buffers for pos: ["+DhSectionPos.toString(bufferContainer.pos)+"], error: ["+e.getMessage()+"].", e);
 				}
-				
-				for (ByteBuffer buffer : transparentBuffers)
-				{
-					MemoryUtil.memFree(buffer);
-				}
+
+				bufferContainer.close();
+				createFuture.completeExceptionally(e);
 			}
 		});
 		
+		//endregion
+		
+		
+		
+		//====================//
+		// upload VBOs to GPU //
+		//====================//
+		//region
+		
+		createFuture.exceptionally((Throwable e) ->
+		{
+			// create VBOs failed //
+			if (!ExceptionUtil.isShutdownException(e))
+			{
+				LOGGER.error("Unexpected issue creating buffer [" + bufferContainer.minCornerBlockPos + "], error: [" + e.getMessage() + "].", e);
+			}
+			
+			bufferContainer.close();
+			future.completeExceptionally(e);
+			return null;
+		});
+		createFuture.thenRun(() ->
+		{
+			CompletableFuture<Void> opaqueFuture = uploadBuffersAsync(future, bufferContainer.vboOpaqueWrappers, opaqueBuffers, opaqueIndexBuffers);
+			CompletableFuture<Void> transparentFuture = uploadBuffersAsync(future, bufferContainer.vboTransparentWrappers, transparentBuffers, transparentIndexBuffers);
+			CompletableFuture<Void> uploadFuture = CompletableFuture.allOf(opaqueFuture, transparentFuture);
+			uploadFuture.exceptionally((Throwable e) ->
+			{
+				// upload failed //
+				if (!ExceptionUtil.isShutdownException(e))
+				{
+					LOGGER.error("Unexpected issue uploading buffer [" + bufferContainer.minCornerBlockPos + "], error: [" + e.getMessage() + "].", e);
+				}
+				
+				bufferContainer.close();
+				future.completeExceptionally(e);
+				return null;
+			});
+			uploadFuture.thenRun(() ->
+			{
+				// upload success //
+				bufferContainer.buffersUploaded = true;
+				future.complete(bufferContainer);
+			});
+		});
+		
+		//endregion
+		
+		
+		
 		return future;
 	}
-	private static IVertexBufferWrapper[] resizeBufferArray(IVertexBufferWrapper[] vbos, int newSize)
+	
+	
+	private ArrayList<ByteBuffer> createIndexBuffers(ArrayList<ByteBuffer> vertexBuffers)
+	{
+		ArrayList<ByteBuffer> indexBuffers = new ArrayList<>();
+		
+		for (int i = 0; i < vertexBuffers.size(); i++)
+		{
+			ByteBuffer buffer = vertexBuffers.get(i);
+			int size = buffer.limit() - buffer.position();
+			int maxVertexCount = size / LodQuadBuilder.BYTES_PER_VERTEX;
+			int quadCount = (maxVertexCount / 4);
+			ByteBuffer indexBuffer = IndexBufferBuilder.createBuffer(quadCount);
+			indexBuffers.add(indexBuffer);
+		}
+		
+		return indexBuffers;
+	}
+	
+	private static IVertexBufferWrapper[] resizeWrapperArray(IVertexBufferWrapper[] vbos, int newSize)
 	{
 		if (vbos.length == newSize)
 		{
@@ -197,46 +249,141 @@ public class LodBufferContainer implements AutoCloseable
 		}
 		return newVbos;
 	}
-	private static void uploadBuffers(IVertexBufferWrapper[] vbos, ArrayList<ByteBuffer> byteBuffers) throws InterruptedException
+	
+	private static void createBufferWrappers(IVertexBufferWrapper[] vboWrappers, ArrayList<ByteBuffer> vertexBuffers)
 	{
-		int vboIndex = 0;
-		for (int i = 0; i < byteBuffers.size(); i++)
+		for (int i = 0; i < vertexBuffers.size(); i++)
 		{
-			if (vboIndex >= vbos.length)
+			if (i >= vboWrappers.length)
+			{
+				throw new RuntimeException("Too many vertex buffers!!");
+			}
+			
+			if (vboWrappers[i] == null)
+			{
+				vboWrappers[i] = WRAPPER_FACTORY.createVboWrapper("distantHorizons:TerrainRenderer");
+			}
+		}
+	}
+	
+	/** Index buffers should be null if {@link AbstractDhRenderApiDefinition#useSingleIbo()} returns true. */
+	private static CompletableFuture<Void> uploadBuffersAsync(
+		CompletableFuture<LodBufferContainer> parentFuture,
+		IVertexBufferWrapper[] vboWrappers, 
+		ArrayList<ByteBuffer> vertexBuffers, @Nullable ArrayList<ByteBuffer> indexBuffers
+		)
+	{
+		ArrayList<CompletableFuture<Void>> uploadFutureList = new ArrayList<>();
+		int vboIndex = 0;
+		for (int i = 0; i < vertexBuffers.size(); i++)
+		{
+			if (vboIndex >= vboWrappers.length)
 			{
 				throw new RuntimeException("Too many vertex buffers!!");
 			}
 			
 			
-			// get or create the VBO
-			if (vbos[vboIndex] == null)
-			{
-				vbos[vboIndex] = SingletonInjector.INSTANCE.get(IWrapperFactory.class).createVboWrapper("distantHorizons:McLodRenderer");
-			}
-			IVertexBufferWrapper vbo = vbos[vboIndex];
 			
-			ByteBuffer buffer = byteBuffers.get(i);
-			int size = buffer.limit() - buffer.position();
-			int vertexCount = size / LodQuadBuilder.BYTES_PER_VERTEX;
+			// final variables for use in lambdas //
 			
-			try
+			final IVertexBufferWrapper finalVboWrapper = vboWrappers[vboIndex];
+			
+			final ByteBuffer finalVertexBuffer = vertexBuffers.get(vboIndex);
+			// index buffers are optional
+			@Nullable final ByteBuffer finalIndexBuffer = (indexBuffers != null) ? indexBuffers.get(vboIndex) : null;
+			
+			final int finalVertexCount = vertexByteBufferToVertexCount(finalVertexBuffer);
+			
+			
+			
+			//===============//
+			// vertex upload //
+			//===============//
+			//region
+			
+			CompletableFuture<Void> vertexUploadFuture = new CompletableFuture<>();
+			uploadFutureList.add(vertexUploadFuture);
+			
+			
+			final StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
+			RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("LodBufferContainer VBO Upload", () ->
 			{
-				vbo.upload(buffer, vertexCount);
-			}
-			catch (Exception e)
+				try
+				{
+					// skip this event if requested
+					if (Thread.interrupted()
+						|| parentFuture.isCancelled())
+					{
+						throw new InterruptedException();
+					}
+					
+					finalVboWrapper.uploadVertexBuffer(finalVertexBuffer, finalVertexCount);
+					vertexUploadFuture.complete(null);
+				}
+				catch (Exception e)
+				{
+					LOGGER.error("Failed to upload buffer. Error: [" + e.getMessage() + "].", e);
+					vertexUploadFuture.completeExceptionally(e);
+				}
+			});
+			
+			//endregion
+			
+			
+			
+			//==============//
+			// index upload //
+			//==============//
+			//region
+			
+			if (finalIndexBuffer != null)
 			{
-				vbos[vboIndex] = null;
-				vbo.close();
-				LOGGER.error("Failed to upload buffer. Error: ["+e.getMessage()+"].", e);
+				CompletableFuture<Void> indexUploadFuture = new CompletableFuture<>();
+				uploadFutureList.add(indexUploadFuture);
+				
+				RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("LodBufferContainer IBO Upload", () ->
+				{
+					try
+					{
+						// skip this event if requested
+						if (Thread.interrupted()
+							|| parentFuture.isCancelled())
+						{
+							throw new InterruptedException();
+						}
+						
+						finalVboWrapper.uploadIndexBuffer(finalIndexBuffer, finalVertexCount);
+						indexUploadFuture.complete(null);
+					}
+					catch (Exception e)
+					{
+						finalVboWrapper.close();
+						indexUploadFuture.completeExceptionally(e);
+					}
+				});
 			}
+			//endregion
+			
+			
 			
 			vboIndex++;
 		}
 		
-		if (vboIndex < vbos.length)
+		if (vboIndex < vboWrappers.length)
 		{
 			throw new RuntimeException("Too few vertex buffers!!");
 		}
+		
+		
+		
+		// merge futures //
+		
+		CompletableFuture<?>[] futureArray = new CompletableFuture[uploadFutureList.size()];
+		for (int i = 0; i < uploadFutureList.size(); i++)
+		{
+			futureArray[i] = uploadFutureList.get(i);
+		}
+		return CompletableFuture.allOf(futureArray);
 	}
 	
 	//endregion
@@ -248,28 +395,33 @@ public class LodBufferContainer implements AutoCloseable
 	//================//
 	//region
 	
+	private static int vertexByteBufferToVertexCount(ByteBuffer buffer)
+	{
+		int size = buffer.limit() - buffer.position();
+		int vertexCount = size / LodQuadBuilder.BYTES_PER_VERTEX;
+		return vertexCount;
+	}
+	
 	/** can be used when debugging */
-	public boolean hasNonNullVbos() { return this.vbos != null || this.vbosTransparent != null; }
+	public boolean hasNonNullVbos() { return this.vboOpaqueWrappers != null || this.vboTransparentWrappers != null; }
 	
 	/** can be used when debugging */
 	public int vboBufferCount() 
 	{
 		int count = 0;
 		
-		if (this.vbos != null)
+		if (this.vboOpaqueWrappers != null)
 		{
-			count += this.vbos.length;
+			count += this.vboOpaqueWrappers.length;
 		}
 		
-		if (this.vbosTransparent != null)
+		if (this.vboTransparentWrappers != null)
 		{
-			count += this.vbosTransparent.length;
+			count += this.vboTransparentWrappers.length;
 		}
 		
 		return count;
 	}
-	
-	public boolean uploadInProgress() { return this.uploadFutureRef.get() != null; }
 	
 	//endregion
 	
@@ -293,24 +445,27 @@ public class LodBufferContainer implements AutoCloseable
 		
 		RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("LodBufferContainer Close", () -> 
 		{
-			for (IVertexBufferWrapper buffer : this.vbos)
-			{
-				if (buffer != null)
-				{
-					buffer.close();
-				}
-			}
-			
-			for (IVertexBufferWrapper buffer : this.vbosTransparent)
-			{
-				if (buffer != null)
-				{
-					buffer.close();
-				}
-			}
+			tryCloseBufferWrapperArray(this.vboOpaqueWrappers);
+			tryCloseBufferWrapperArray(this.vboTransparentWrappers);
 			
 			this.uniformContainer.close();
 		});
+	}
+	
+	private static void tryCloseBufferWrapperArray(@Nullable IVertexBufferWrapper[] bufferWrappers)
+	{
+		if (bufferWrappers != null)
+		{
+			for (int i = 0; i < bufferWrappers.length; i++)
+			{
+				IVertexBufferWrapper buffer = bufferWrappers[i];
+				bufferWrappers[i] = null;
+				if (buffer != null)
+				{
+					buffer.close();
+				}
+			}
+		}
 	}
 	
 	//endregion

@@ -4,19 +4,17 @@ import com.seibel.distanthorizons.api.enums.rendering.EDhApiRenderPass;
 import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
 import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import com.seibel.distanthorizons.core.api.internal.rendering.DhRenderState;
+import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.jar.EPlatform;
 import com.seibel.distanthorizons.core.level.IDhClientLevel;
 import com.seibel.distanthorizons.core.util.RenderUtil;
-import com.seibel.distanthorizons.core.util.math.Mat4f;
-import com.seibel.distanthorizons.core.util.math.Vec3d;
-import com.seibel.distanthorizons.core.util.threading.PriorityTaskPicker;
-import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
+import com.seibel.distanthorizons.core.util.math.DhMat4f;
+import com.seibel.distanthorizons.core.util.math.DhVec3d;
 import com.seibel.distanthorizons.core.world.IDhClientWorld;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.AbstractOptifineAccessor;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IOptifineAccessor;
 import com.seibel.distanthorizons.core.wrapperInterfaces.render.renderPass.IDhGenericRenderer;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 
@@ -30,8 +28,14 @@ public class RenderParams extends DhApiRenderParam
 	private static final IMinecraftClientWrapper MC_CLIENT = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	
-	private static final long TIME_FOR_MAC_TO_FINISH_COMPILING_IN_MS = 10_000;
-	private static boolean initialLoadingComplete = false;
+	private static final IOptifineAccessor OPTIFINE_ACCESSOR = ModAccessorInjector.INSTANCE.get(IOptifineAccessor.class);
+	
+	/** 
+	 * Copy used for API events. <br>
+	 * A separate copy is used to prevent API users from accidentally setting values
+	 * that screw up DH's copy of the render parameters.
+	 */
+	public final DhApiRenderParam apiCopy = new DhApiRenderParam();
 	
 	
 	public IDhClientWorld dhClientWorld;
@@ -41,7 +45,7 @@ public class RenderParams extends DhApiRenderParam
 	public ILightMapWrapper lightmap;
 	public RenderBufferHandler renderBufferHandler;
 	public IDhGenericRenderer genericRenderer;
-	public Vec3d exactCameraPosition;
+	public DhVec3d exactCameraPosition;
 	/** @see DhRenderState#vanillaFogEnabled */
 	public boolean vanillaFogEnabled;
 	
@@ -54,36 +58,27 @@ public class RenderParams extends DhApiRenderParam
 	//=============//
 	//region
 	
-	public RenderParams(EDhApiRenderPass renderPass, DhRenderState renderState)
+	public void update(EDhApiRenderPass renderPass, DhRenderState renderState)
 	{
-		this(renderPass,
-			renderState.partialTickTime,
-			renderState.mcProjectionMatrix, renderState.mcModelViewMatrix,
-			renderState.clientLevelWrapper,
-			renderState.vanillaFogEnabled
-		);
-	}
-	private RenderParams(
-			EDhApiRenderPass renderPass,
-			float newPartialTicks,
-			Mat4f newMcProjectionMatrix, Mat4f newMcModelViewMatrix,
-			IClientLevelWrapper clientLevelWrapper,
-			boolean vanillaFogEnabled
-		)
-	{
-		super(renderPass,
-			newPartialTicks,
-			RenderUtil.getNearClipPlaneInBlocks(), RenderUtil.getFarClipPlaneDistanceInBlocks(),
-			newMcProjectionMatrix, newMcModelViewMatrix,
-			RenderUtil.createLodProjectionMatrix(newMcProjectionMatrix), RenderUtil.createLodModelViewMatrix(newMcModelViewMatrix),
-			clientLevelWrapper.getMinHeight(),
-			clientLevelWrapper);
+		RenderUtil.setDhProjectionMatrix(this.dhProjectionMatrix, renderState.mcProjectionMatrix);
+		this.dhModelViewMatrix.set(renderState.mcModelViewMatrix); // DH and MC MVM matrix are the same 
 		
+		super.update(renderPass,
+			renderState.partialTickTime,
+			RenderUtil.getNearClipPlaneInBlocks(), RenderUtil.getFarClipPlaneDistanceInBlocks(),
+			renderState.mcProjectionMatrix, renderState.mcModelViewMatrix,
+			this.dhProjectionMatrix, this.dhModelViewMatrix,
+			renderState.clientLevelWrapper.getMinHeight(),
+			renderState.clientLevelWrapper);
+		
+		
+		
+		this.clientLevelWrapper = renderState.clientLevelWrapper;
 		
 		this.dhClientWorld = SharedApi.tryGetDhClientWorld();
 		if (this.dhClientWorld != null)
 		{
-			this.dhClientLevel = (IDhClientLevel) this.dhClientWorld.getLevel(clientLevelWrapper);
+			this.dhClientLevel = this.dhClientWorld.getOrLoadClientLevel(clientLevelWrapper);
 			if (this.dhClientLevel != null)
 			{
 				this.renderBufferHandler = this.dhClientLevel.getRenderBufferHandler();
@@ -91,7 +86,6 @@ public class RenderParams extends DhApiRenderParam
 			}
 		}
 		
-		this.clientLevelWrapper = clientLevelWrapper;
 		this.lightmap = MC_RENDER.getLightmapWrapper(this.clientLevelWrapper);
 		
 		if (MC_CLIENT.playerExists())
@@ -99,8 +93,9 @@ public class RenderParams extends DhApiRenderParam
 			this.exactCameraPosition = MC_RENDER.getCameraExactPosition();
 		}
 		
-		this.vanillaFogEnabled = vanillaFogEnabled;
+		this.vanillaFogEnabled = renderState.vanillaFogEnabled;
 		
+		this.apiCopy.update(this);
 	}
 	
 	//endregion
@@ -116,7 +111,7 @@ public class RenderParams extends DhApiRenderParam
 	 * Should be called before rendering is done.
 	 * @return a message if LODs shouldn't be rendered, null if the LODs can render 
 	 */
-	public String getValidationErrorMessage(long firstRenderTimeMs)
+	public String getValidationErrorMessage()
 	{
 		// Note: all strings here should be constants to prevent String allocations
 		
@@ -158,57 +153,27 @@ public class RenderParams extends DhApiRenderParam
 			return "No Generic Renderer Present";
 		}
 		
-		if (this.dhModelViewMatrix == null
-			|| this.mcModelViewMatrix == null)
+		if (this.dhModelViewMatrix.equals(DhMat4f.IDENTITY) 
+			|| this.dhModelViewMatrix.equals(DhMat4f.EMPTY))
 		{
-			return "No MVM or Proj Matrix Given";
+			return "No DH MVM Matrix Given";
 		}
 		
-		if (AbstractOptifineAccessor.optifinePresent()
+		if (this.mcModelViewMatrix.equals(DhMat4f.IDENTITY) 
+			|| this.mcModelViewMatrix.equals(DhMat4f.EMPTY))
+		{
+			return "No MC MVM Matrix Given";
+		}
+		
+		// projection matrix not checked since there are some MC versions where
+		// the MVM and projection matrices are pre-multiplied together
+		
+		if (OPTIFINE_ACCESSOR != null
 			&& MC_RENDER.getTargetFramebuffer() == -1)
 		{
 			// wait for MC to finish setting up their renderer
 			return "Optifine Target Frame Buffer not set";
 		}
-		
-		
-		//// potential fix for a segfault when
-		//// Sodium and DH are running together
-		//if (EPlatform.get() == EPlatform.MACOS
-		//	&& !initialLoadingComplete)
-		//{
-		//	// Once MC starts rendering, wait a few seconds so
-		//	// MC/Sodium can finish their shader compiling before DH does its own.
-		//	// This will allow DH to compile its own shaders after Sodium finishes
-		//	// compiling its own.
-		//	long nowMs = System.currentTimeMillis();
-		//	long firstAllowedRenderTimeMs = firstRenderTimeMs + TIME_FOR_MAC_TO_FINISH_COMPILING_IN_MS;
-		//	if (nowMs < firstAllowedRenderTimeMs)
-		//	{
-		//		return "Waiting for initial MC compile...";
-		//	}
-		//	
-		//	
-		//	// null shouldn't happen, but just in case
-		//	PriorityTaskPicker.Executor renderLoadExecutor = ThreadPoolUtil.getRenderLoadingExecutor();
-		//	if (renderLoadExecutor == null)
-		//	{
-		//		return "Waiting for DH Threadpool...";
-		//	}
-		//	
-		//	// wait for DH to finish loading, by the time that's done
-		//	// java should have finished all of DH's JIT compiling,
-		//	// which will hopefully mean less concurrency and thus a lower
-		//	// chance of breaking
-		//	// (plus this gives Sodium/vanill a bit longer to finish their setup)
-		//	int taskCount = renderLoadExecutor.getQueueSize();
-		//	if (taskCount > 0)
-		//	{
-		//		return "Waiting for DH JIT compiling...";
-		//	}
-		//	
-		//	initialLoadingComplete = true;
-		//}
 		
 		
 		return null;

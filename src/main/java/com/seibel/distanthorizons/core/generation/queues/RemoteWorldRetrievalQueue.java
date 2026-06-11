@@ -1,4 +1,4 @@
-package com.seibel.distanthorizons.core.generation;
+package com.seibel.distanthorizons.core.generation.queues;
 
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.file.fullDatafile.V2.FullDataSourceProviderV2;
@@ -15,7 +15,6 @@ import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.WorldGenUtil;
 import com.seibel.distanthorizons.core.util.objects.RollingAverage;
 import com.seibel.distanthorizons.core.logging.DhLogger;
-import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
 
 import java.util.concurrent.*;
 
@@ -51,6 +50,9 @@ public class RemoteWorldRetrievalQueue extends AbstractFullDataNetworkRequestQue
 	public byte lowestDataDetail() { return FullDataSourceProviderV2.ROOT_SECTION_DETAIL_LEVEL; }
 	@Override
 	public byte highestDataDetail() { return LodUtil.BLOCK_DETAIL_LEVEL; }
+	
+	@Override 
+	public String getRetrievalTypeName() { return "downloading LODs"; }
 	
 	@Override
 	public CompletableFuture<DataSourceRetrievalResult> submitRetrievalTask(long sectionPos, byte requiredDataDetail)

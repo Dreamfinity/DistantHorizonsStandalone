@@ -37,6 +37,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrappe
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.coreapi.util.BitShiftUtil;
+import com.seibel.distanthorizons.coreapi.util.ColorUtil;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import com.seibel.distanthorizons.core.logging.DhLogger;
@@ -135,7 +136,7 @@ public class FullDataToRenderDataTransformer
 				{
 					columnSource.populateColumnView(columnArrayView, x, z);
 					LongArrayList dataColumn = fullDataSource.getColumnAtRelPos(x, z);
-
+					
 					updateOrReplaceRenderDataViewColumnWithFullDataColumn(
 						levelWrapper, fullDataSource,
 						// bit shift is to account for LODs with a detail level greater than 0 so the block pos is correct
@@ -153,8 +154,8 @@ public class FullDataToRenderDataTransformer
 	/** Updates the given {@link ColumnRenderView} to match the incoming Full data {@link LongArrayList} */
 	public static void updateOrReplaceRenderDataViewColumnWithFullDataColumn(
 			IClientLevelWrapper levelWrapper,
-			FullDataSourceV2 fullDataSource, int blockX, int blockZ,
-			ColumnRenderView columnArrayView,
+			FullDataSourceV2 fullDataSource, int blockX, int blockZ, 
+			ColumnRenderView columnArrayView, 
 			LongArrayList fullDataColumn,
 			// pooled references
 			PhantomArrayListCheckout phantomCheckout, ColumnRenderView tempExpandingColumnView, RenderDataPointReducingList reducingList, DhBlockPosMutable mutableBlockPos)
@@ -175,7 +176,7 @@ public class FullDataToRenderDataTransformer
 		else
 		{
 			LongArrayList dataArrayList = phantomCheckout.getLongArray(0, fullDataLength);
-
+			
 			// expand the ColumnArrayView to fit the new larger max vertical size
 			tempExpandingColumnView.populate(dataArrayList, fullDataLength, 0, fullDataLength);
 			setRenderColumnView(levelWrapper, fullDataSource, blockX, blockZ, tempExpandingColumnView, fullDataColumn, mutableBlockPos);
@@ -186,15 +187,14 @@ public class FullDataToRenderDataTransformer
 	private static void setRenderColumnView(
 			IClientLevelWrapper levelWrapper, FullDataSourceV2 fullDataSource,
 			int blockX, int blockZ,
-			ColumnRenderView renderColumnData, LongArrayList fullColumnData,
-			DhBlockPosMutable mutableBlockPos)
+			ColumnRenderView renderColumnData, LongArrayList fullColumnData, DhBlockPosMutable mutableBlockPos)
 	{
 		//===============//
 		// config values //
 		//===============//
 		
-		boolean ignoreNonCollidingBlocks = (Config.Client.Advanced.Graphics.Quality.blocksToIgnore.get() == EDhApiBlocksToAvoid.NON_COLLIDING);
-		boolean colorBelowWithAvoidedBlocks = Config.Client.Advanced.Graphics.Quality.tintWithAvoidedBlocks.get();
+		boolean ignoreNonCollidingBlocks = (Config.Client.Advanced.Graphics.Culling.blocksToIgnore.get() == EDhApiBlocksToAvoid.NON_COLLIDING);
+		boolean colorBelowWithAvoidedBlocks = Config.Client.Advanced.Graphics.Culling.tintWithAvoidedBlocks.get();
 		
 		final ObjectOpenHashSet<IBlockStateWrapper> blockStatesToIgnore = WRAPPER_FACTORY.getRendererIgnoredBlocks(levelWrapper);
 		final ObjectOpenHashSet<IBlockStateWrapper> caveBlockStatesToIgnore = WRAPPER_FACTORY.getRendererIgnoredCaveBlocks(levelWrapper);
@@ -452,8 +452,17 @@ public class FullDataToRenderDataTransformer
 				// use the previous block's color
 				color = colorToApplyToNextBlock;
 				colorToApplyToNextBlock = -1;
-				skyLight = skylightToApplyToNextBlock;
-				blockLight = blocklightToApplyToNextBlock;
+				
+				// use the skylight override if present
+				if (skylightToApplyToNextBlock != -1)
+				{
+					skyLight = skylightToApplyToNextBlock;
+				}
+				
+				if (blocklightToApplyToNextBlock != -1)
+				{
+					blockLight = blocklightToApplyToNextBlock;
+				}
 			}
 			
 			

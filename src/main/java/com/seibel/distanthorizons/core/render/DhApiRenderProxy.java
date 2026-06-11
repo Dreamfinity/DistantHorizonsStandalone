@@ -19,6 +19,8 @@
 
 package com.seibel.distanthorizons.core.render;
 
+import com.seibel.distanthorizons.api.enums.config.EDhApiRenderingApi;
+import com.seibel.distanthorizons.api.enums.config.EDhApiRenderingEngine;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderProxy;
 import com.seibel.distanthorizons.api.objects.DhApiResult;
 import com.seibel.distanthorizons.core.api.internal.SharedApi;
@@ -28,6 +30,8 @@ import com.seibel.distanthorizons.core.level.IDhLevel;
 import com.seibel.distanthorizons.core.util.RenderUtil;
 import com.seibel.distanthorizons.core.world.AbstractDhWorld;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.render.AbstractDhRenderApiDefinition;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Used to interact with Distant Horizons' rendering systems.
@@ -43,6 +47,18 @@ public class DhApiRenderProxy implements IDhApiRenderProxy
 	
 	private boolean deferTransparentRendering = false;
 	
+	private static AbstractDhRenderApiDefinition renderApiDef = null;
+	@Nullable
+	private static AbstractDhRenderApiDefinition tryGetApiDef()
+	{
+		if (renderApiDef == null)
+		{
+			renderApiDef = SingletonInjector.INSTANCE.get(AbstractDhRenderApiDefinition.class);
+		}
+		
+		return renderApiDef; 
+	}
+	
 	
 	
 	//=============//
@@ -57,6 +73,7 @@ public class DhApiRenderProxy implements IDhApiRenderProxy
 	// methods //
 	//=========//
 	
+	@Override
 	public DhApiResult<Boolean> clearRenderDataCache()
 	{
 		// make sure this is a valid time to run the method
@@ -78,6 +95,32 @@ public class DhApiRenderProxy implements IDhApiRenderProxy
 		}
 		
 		return DhApiResult.createSuccess();
+	}
+	
+	@Override 
+	public EDhApiRenderingApi getRenderingApi() throws IllegalStateException
+	{
+		AbstractDhRenderApiDefinition apiDef = tryGetApiDef();
+		if (apiDef == null)
+		{
+			// The rendering API hasn't been set up yet
+			throw new IllegalStateException("Distant Horizons hasn't finished setup yet. No renderer has been set.");
+		}
+		
+		return apiDef.getRenderApi();
+	}
+	
+	@Override 
+	public boolean isNativeRenderer() throws IllegalStateException
+	{
+		AbstractDhRenderApiDefinition apiDef = tryGetApiDef();
+		if (apiDef == null)
+		{
+			// The rendering API hasn't been set up yet
+			throw new IllegalStateException("Distant Horizons hasn't finished setup yet. No renderer has been set.");
+		}
+		
+		return apiDef.isNativeRenderer();
 	}
 	
 	

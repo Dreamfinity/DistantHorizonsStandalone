@@ -19,12 +19,15 @@
 
 package com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding;
 
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiTransparency;
 import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.level.IDhClientLevel;
 import com.seibel.distanthorizons.core.util.objects.pooling.PhantomArrayListCheckout;
-import com.seibel.distanthorizons.core.util.ColorUtil;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import com.seibel.distanthorizons.coreapi.util.ColorUtil;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnRenderView;
@@ -51,7 +54,7 @@ public class ColumnBox
 	
 	public static void addBoxQuadsToBuilder(
 			LodQuadBuilder builder, PhantomArrayListCheckout phantomArrayCheckout, IDhClientLevel clientLevel,
-			short width, short yHeight,
+			short blockWidth, short yHeight,
 			short minX, short minY, short minZ,
 			int color, byte irisBlockMaterialId, byte skyLight, byte blockLight,
 			long topData, long bottomData, ColumnRenderView[] adjData, boolean[] isAdjDataSameDetailLevel)
@@ -60,14 +63,19 @@ public class ColumnBox
 		// variable setup //
 		//================//
 		
-		short maxX = (short) (minX + width);
+		IClientLevelWrapper clientLevelWrapper = clientLevel.getClientLevelWrapper();
+		if (clientLevelWrapper == null)
+		{
+			LodUtil.assertNotReach("addBoxQuadsToBuilder getClientLevelWrapper should always succeed");
+		}
+		
+		short maxX = (short) (minX + blockWidth);
 		short maxY = (short) (minY + yHeight);
-		short maxZ = (short) (minZ + width);
+		short maxZ = (short) (minZ + blockWidth);
 		byte skyLightTop = skyLight;
 		byte skyLightBot = RenderDataPointUtil.doesDataPointExist(bottomData) ? RenderDataPointUtil.getLightSky(bottomData) : 0;
 		
-		boolean transparencyEnabled = Config.Client.Advanced.Graphics.Quality.transparency.get().transparencyEnabled;
-		boolean fakeOceanFloor = Config.Client.Advanced.Graphics.Quality.transparency.get().fakeTransparencyEnabled;
+		boolean transparencyEnabled = Config.Client.Advanced.Graphics.Quality.transparency.get() == EDhApiTransparency.COMPLETE;
 		
 		boolean isTransparent = ColorUtil.getAlpha(color) < 255 && transparencyEnabled;
 		boolean overVoid = !RenderDataPointUtil.doesDataPointExist(bottomData);
@@ -92,24 +100,6 @@ public class ColumnBox
 		}
 		
 		
-		// fake ocean transparency
-		if (transparencyEnabled && fakeOceanFloor)
-		{
-			if (!isTransparent && isTopTransparent && RenderDataPointUtil.doesDataPointExist(topData))
-			{
-				skyLightTop = (byte) MathUtil.clamp(0, 15 - (RenderDataPointUtil.getYMax(topData) - minY), 15);
-				yHeight = (short) (RenderDataPointUtil.getYMax(topData) - minY - 1);
-			}
-			else if (isTransparent && !isBottomTransparent && RenderDataPointUtil.doesDataPointExist(bottomData))
-			{
-				minY = (short) (minY + yHeight - 1);
-				yHeight = 1;
-			}
-			
-			maxY = (short) (minY + yHeight);
-		}
-		
-		
 		
 		//==========================//
 		// add top and bottom faces //
@@ -122,7 +112,7 @@ public class ColumnBox
 					&& !isTopTransparent;
 			if (!skipTop)
 			{
-				builder.addQuadUp(minX, maxY, minZ, width, ColorUtil.applyShade(color, MC_RENDER.getShade(EDhDirection.UP)), irisBlockMaterialId, skyLightTop, blockLight);
+				builder.addQuadUp(minX, maxY, minZ, blockWidth, ColorUtil.applyShade(color, clientLevelWrapper.getShade(EDhDirection.UP)), irisBlockMaterialId, skyLightTop, blockLight);
 			}
 		}
 		
@@ -133,7 +123,7 @@ public class ColumnBox
 					&& !isBottomTransparent;
 			if (!skipBottom)
 			{
-				builder.addQuadDown(minX, minY, minZ, width, ColorUtil.applyShade(color, MC_RENDER.getShade(EDhDirection.DOWN)), irisBlockMaterialId, skyLightBot, blockLight);
+				builder.addQuadDown(minX, minY, minZ, blockWidth, ColorUtil.applyShade(color, clientLevelWrapper.getShade(EDhDirection.DOWN)), irisBlockMaterialId, skyLightBot, blockLight);
 			}
 		}
 		
@@ -156,16 +146,16 @@ public class ColumnBox
 					builder.addQuadAdj(
 							EDhDirection.NORTH, 
 							minX, minY, minZ, 
-							width, yHeight, 
+							blockWidth, yHeight, 
 							color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight);
 				}
 			}
 			else
 			{
 				makeAdjVerticalQuad(
-						builder, phantomArrayCheckout, 
+						builder, phantomArrayCheckout, clientLevelWrapper,
 						adjCol, adjSameDetailLevel, caveCullingMaxY, EDhDirection.NORTH, 
-						minX, minY, minZ, width, yHeight,
+						minX, minY, minZ, blockWidth, yHeight,
 						color, irisBlockMaterialId, blockLight);
 			}
 		}
@@ -181,16 +171,16 @@ public class ColumnBox
 					builder.addQuadAdj(
 							EDhDirection.SOUTH, 
 							minX, minY, maxZ, 
-							width, yHeight, 
+							blockWidth, yHeight, 
 							color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight);
 				}
 			}
 			else
 			{
 				makeAdjVerticalQuad(
-						builder, phantomArrayCheckout,
+						builder, phantomArrayCheckout, clientLevelWrapper,
 						adjCol, adjSameDetailLevel, caveCullingMaxY, EDhDirection.SOUTH,
-						minX, minY, maxZ, width, yHeight,
+						minX, minY, maxZ, blockWidth, yHeight,
 						color, irisBlockMaterialId, blockLight);
 			}
 		}
@@ -206,16 +196,16 @@ public class ColumnBox
 					builder.addQuadAdj(
 							EDhDirection.WEST, 
 							minX, minY, minZ, 
-							width, yHeight, 
+							blockWidth, yHeight, 
 							color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight);
 				}
 			}
 			else
 			{
 				makeAdjVerticalQuad(
-						builder, phantomArrayCheckout,
+						builder, phantomArrayCheckout, clientLevelWrapper,
 						adjCol, adjSameDetailLevel, caveCullingMaxY, EDhDirection.WEST, 
-						minX, minY, minZ, width, yHeight,
+						minX, minY, minZ, blockWidth, yHeight,
 						color, irisBlockMaterialId, blockLight);
 			}
 		}
@@ -231,73 +221,70 @@ public class ColumnBox
 					builder.addQuadAdj(
 							EDhDirection.EAST, 
 							maxX, minY, minZ, 
-							width, yHeight, 
+							blockWidth, yHeight, 
 							color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight);
 				}
 			}
 			else
 			{
 				makeAdjVerticalQuad(
-						builder, phantomArrayCheckout,
+						builder, phantomArrayCheckout, clientLevelWrapper,
 						adjCol, adjSameDetailLevel, caveCullingMaxY, EDhDirection.EAST, 
-						maxX, minY, minZ, width, yHeight,
+						maxX, minY, minZ, blockWidth, yHeight,
 						color, irisBlockMaterialId, blockLight);
 			}
 		}
 	}
 	
 	private static void makeAdjVerticalQuad(
-		LodQuadBuilder builder, PhantomArrayListCheckout phantomArrayCheckout,
+		LodQuadBuilder builder, PhantomArrayListCheckout phantomArrayCheckout, IClientLevelWrapper clientLevelWrapper,
 		@NotNull ColumnRenderView adjColumnView, boolean adjacentIsSameDetailLevel, int caveCullingMaxY, EDhDirection direction,
-		short x, short yMin, short z, short horizontalWidth, short ySize,
+		short x, short yMin, short z, short horizontalBlockWidth, short ySize,
 		int color, byte irisBlockMaterialId, byte blockLight)
 	{
-		// pooled arrays -- swap between pair[0] and pair[1] instead of copying
-		LongArrayList[] pair = {
-			phantomArrayCheckout.getLongArray(0, 0),
-			phantomArrayCheckout.getLongArray(1, 0)
-		};
-		int cur = 0;
-
-
-
+		// pooled arrays
+		LongArrayList segments = phantomArrayCheckout.getLongArray(0, 0);
+		LongArrayList newSegments = phantomArrayCheckout.getLongArray(1, 0);
+		
+		
+		
 		//==================//
 		// create face with //
 		// no adjacent data //
 		//==================//
-
-		color = ColorUtil.applyShade(color, MC_RENDER.getShade(direction));
-
+		
+		color = ColorUtil.applyShade(color, clientLevelWrapper.getShade(direction));
+		
 		if (adjColumnView.size == 0
 			|| RenderDataPointUtil.hasZeroHeight(adjColumnView.get(0)))
 		{
-			builder.addQuadAdj(direction, x, yMin, z, horizontalWidth, ySize, color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight);
+			builder.addQuadAdj(direction, x, yMin, z, horizontalBlockWidth, ySize, color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight);
 			return;
 		}
-
-
-
+		
+		
+		
 		//=================================//
 		// determine face visibility/light //
 		//=================================//
-
-		boolean transparencyEnabled = Config.Client.Advanced.Graphics.Quality.transparency.get().transparencyEnabled;
+		
+		boolean transparencyEnabled = Config.Client.Advanced.Graphics.Quality.transparency.get() == EDhApiTransparency.COMPLETE;
 		boolean inputTransparent = ColorUtil.getAlpha(color) < 255 && transparencyEnabled;
 		short yMax = (short) (yMin + ySize);
-
-
+		
+		
 		int adjCount = adjColumnView.size;
-
+		
 		// Start with the entire range at max light
-		pair[cur].add(YSegmentUtil.encode(yMin, yMax, LodUtil.MAX_MC_LIGHT));
-
+		segments.add(YSegmentUtil.encode(yMin, yMax, LodUtil.MAX_MC_LIGHT));
+		
 		// Process each adjacent datapoint and split segments as needed
 		for (int adjIndex = 0; adjIndex < adjCount; adjIndex++)
 		{
 			long adjPoint = adjColumnView.get(adjIndex);
 			short adjMinY = RenderDataPointUtil.getYMin(adjPoint);
 			short adjMaxY = RenderDataPointUtil.getYMax(adjPoint);
-
+			
 			// skip empty adjacent points
 			// or points below this one
 			if (!RenderDataPointUtil.doesDataPointExist(adjPoint)
@@ -306,70 +293,94 @@ public class ColumnBox
 			{
 				continue;
 			}
-
-
+			
+			
 			long adjAbovePoint = (adjIndex != 0) ? adjColumnView.get(adjIndex - 1) : RenderDataPointUtil.EMPTY_DATA;
 			long adjBelowPoint = (adjIndex + 1 < adjCount) ? adjColumnView.get(adjIndex + 1) : RenderDataPointUtil.EMPTY_DATA;
-
+			
 			boolean adjOverVoid = !RenderDataPointUtil.doesDataPointExist(adjBelowPoint);
-			boolean adjTransparent =
+			boolean adjTransparent = 
 				!adjOverVoid
 				&& RenderDataPointUtil.getAlpha(adjPoint) < 255
 				&& transparencyEnabled;
-
+			
 			byte adjSkyLight = RenderDataPointUtil.getLightSky(adjPoint);
 			byte lightToApply;
-
+			
 			if (!adjTransparent)
 			{
 				// Adjacent is opaque
-				boolean adjacentCoversThis =
-					!adjacentIsSameDetailLevel
-						&& RenderDataPointUtil.getYMax(adjPoint) >= caveCullingMaxY
-						&&
-						(
-							(x == 0 && direction == EDhDirection.WEST)
-							|| (z == 0 && direction == EDhDirection.NORTH)
-							|| (x == 256 && direction == EDhDirection.EAST)
-							|| (z == 256 && direction == EDhDirection.SOUTH)
-						);
-
-				lightToApply = adjacentCoversThis ? adjSkyLight : SKYLIGHT_COVERED;
+				
+				// The following logic is done to provide a little bit of overdraw to
+				// prevent holes when low detail LODs are replaced by higher-detail ones
+				// when moving.
+				// If not done higher quality LODs can cause holes due to not 
+				// covering the whole face like the lower detail LODs they replaced,
+				// while still culling most LODs that are covered by other blocks.
+				
+				boolean onBorder = 
+					(direction == EDhDirection.WEST && x == 0)
+					|| (direction == EDhDirection.NORTH && z == 0)
+					|| (direction == EDhDirection.EAST && x == ((horizontalBlockWidth) * (ColumnRenderSource.WIDTH)))
+					|| (direction == EDhDirection.SOUTH && z == ((horizontalBlockWidth) * (ColumnRenderSource.WIDTH)));
+				
+				boolean isLit =
+					RenderDataPointUtil.getLightSky(adjPoint) != LodUtil.MIN_MC_LIGHT
+					|| RenderDataPointUtil.getLightBlock(adjPoint) != LodUtil.MIN_MC_LIGHT;
+				
+				// render the face if...
+				boolean useAdjLighting =
+					// we're on the border... (holes can only happen on LOD borders since faces inside an LOD will always be the same detail level)
+					onBorder
+					// ...this face has some sort of lighting... (0 light generally means the face is covered by other blocks)
+					&& isLit
+					// ...and is above the culling height
+					&& RenderDataPointUtil.getYMax(adjPoint) >= caveCullingMaxY;
+				
+				lightToApply = useAdjLighting ? adjSkyLight : SKYLIGHT_COVERED;
 			}
 			else
 			{
 				// Adjacent is transparent, use below light
 				lightToApply = RenderDataPointUtil.getLightSky(adjBelowPoint);
 			}
-
-
+			
+			
 			// Apply light to the range [adjMinY, adjMaxY)
-			applyLightToRange(pair[cur], pair[1 - cur], adjMinY, adjMaxY, lightToApply);
-			cur = 1 - cur;
-
+			applyLightToRangeAndPopulateNewSgements(segments, newSegments, adjMinY, adjMaxY, lightToApply);
+			{
+				// swap references so we can use the newly populated segments
+				LongArrayList temp = segments;
+				segments = newSegments;
+				newSegments = temp;
+			}
+			
 			// Fill overhang area [adjMaxY, adjAboveMinY) with adjSkyLight
 			short adjAboveMinY = RenderDataPointUtil.getYMin(adjAbovePoint);
 			if (adjMaxY < adjAboveMinY)
 			{
-				applyLightToRange(pair[cur], pair[1 - cur], adjMaxY, adjAboveMinY, adjSkyLight);
-				cur = 1 - cur;
+				applyLightToRangeAndPopulateNewSgements(segments, newSegments, adjMaxY, adjAboveMinY, adjSkyLight);
+				{
+					LongArrayList temp = segments;
+					segments = newSegments;
+					newSegments = temp;
+				}
 			}
 		}
-
-
-
+		
+		
+		
 		//=======================//
 		// Create vertical faces //
 		// from segments         //
 		//=======================//
-
-		LongArrayList finalSegments = pair[cur];
-		for (int i = 0; i < finalSegments.size(); i++)
+		
+		for (int i = 0; i < segments.size(); i++)
 		{
-			long segment = finalSegments.getLong(i);
+			long segment = segments.getLong(i);
 			tryAddVerticalFaceWithSkyLightToBuilder(
 				builder, direction,
-				x, z, horizontalWidth,
+				x, z, horizontalBlockWidth,
 				color, irisBlockMaterialId, blockLight,
 				YSegmentUtil.getSkyLight(segment), inputTransparent, YSegmentUtil.getEndY(segment), YSegmentUtil.getStartY(segment)
 			);
@@ -379,10 +390,11 @@ public class ColumnBox
 	/**
 	 * Apply the new light value over the given y range,
 	 * splitting segments as needed
+	 * and putting the new segments into "newSegments"
 	 * <p>
 	 * source: claude.ai
 	 */
-	private static void applyLightToRange(
+	private static void applyLightToRangeAndPopulateNewSgements(
 			LongArrayList segments, LongArrayList newSegments, 
 			short rangeStart, short rangeEnd, 
 			byte newLight)

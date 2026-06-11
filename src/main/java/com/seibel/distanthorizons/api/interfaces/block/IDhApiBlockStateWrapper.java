@@ -23,7 +23,10 @@ import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
 import com.seibel.distanthorizons.api.interfaces.IDhApiUnsafeWrapper;
 
 /**
- * A Minecraft version independent way of handling Blocks.
+ * A Minecraft version independent way of handling Blocks. <br><br>
+ * 
+ * Note: the wrapped object (IE the object returned by {@link IDhApiUnsafeWrapper#getWrappedMcObject}) 
+ * will be null if this object is wrapping air.
  *
  * @author James Seibel
  * @version 2023-6-11
@@ -38,6 +41,12 @@ public interface IDhApiBlockStateWrapper extends IDhApiUnsafeWrapper
 	boolean isSolid();
 	/** @since API 1.0.0 */
 	boolean isLiquid();
+	
+	/**
+	 * Returns a value between 0 (fully transparent) and 16 (fully opaque).
+	 * @since 6.1.0 
+	 */
+	int getOpacity();
 	
 	/**
 	 * Returns the full serialized form of the given block

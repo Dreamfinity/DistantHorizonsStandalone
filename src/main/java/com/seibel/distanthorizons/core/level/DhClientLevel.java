@@ -21,13 +21,16 @@ package com.seibel.distanthorizons.core.level;
 
 import com.google.common.cache.CacheBuilder;
 import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.config.eventHandlers.IgnoredDimensionCsvHandler;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.enums.MinecraftTextFormat;
 import com.seibel.distanthorizons.core.file.fullDatafile.V2.FullDataSourceProviderV2;
 import com.seibel.distanthorizons.core.file.fullDatafile.RemoteFullDataSourceProvider;
 import com.seibel.distanthorizons.core.file.structure.ISaveStructure;
-import com.seibel.distanthorizons.core.generation.RemoteWorldRetrievalQueue;
+import com.seibel.distanthorizons.core.generation.queues.RemoteWorldRetrievalQueue;
+import com.seibel.distanthorizons.core.generation.queues.AbstractLodRequestState;
+import com.seibel.distanthorizons.core.generation.queues.LodRequestModule;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.multiplayer.client.ClientNetworkState;
@@ -112,16 +115,19 @@ public class DhClientLevel extends AbstractDhLevel implements IDhClientLevel
 		File saveFolder = saveStructure.getSaveFolder(clientLevelWrapper);
 		File pre23Folder = saveStructure.getPre23SaveFolder(clientLevelWrapper);
 		
+		saveFolder.mkdirs();
+		
 		if (pre23Folder.exists())
 		{
 			if (!pre23Folder.renameTo(saveFolder))
 			{
-				throw new RuntimeException("Could not move old save data folder: " + pre23Folder.getAbsolutePath() + " to " + saveFolder.getAbsolutePath());
+				throw new RuntimeException("Could not move old save data folder: [" + pre23Folder.getAbsolutePath() + "] to [" + saveFolder.getAbsolutePath() + "].");
 			}
 		}
-		else if (saveStructure.getSaveFolder(clientLevelWrapper).mkdirs())
+		
+		if (!saveFolder.exists())
 		{
-			LOGGER.warn("unable to create data folder.");
+			throw new IOException("unable to create save folder at ["+saveFolder.getPath()+"]. If you're on Windows you may need to enable long file paths.");
 		}
 		
 		this.levelWrapper = clientLevelWrapper;
@@ -165,15 +171,17 @@ public class DhClientLevel extends AbstractDhLevel implements IDhClientLevel
 			}
 			
 			
+			// Check this before decoding data to prevent errors if multiple client levels 
+			// are receiving data at once (Immersive Portals compatibility).
+			boolean isSameLevel = message.isSameLevelAs(this.levelWrapper);
+			//NETWORK_LOGGER.debug("Buffer ["+message.payload.dtoBufferId+"] isSameLevel: ["+isSameLevel+"]");
+			if (!isSameLevel)
+			{
+				return;
+			}
+			
 			try (FullDataSourceV2DTO dataSourceDto = this.networkState.fullDataPayloadReceiver.decodeDataSource(message.payload))
 			{
-				boolean isSameLevel = message.isSameLevelAs(this.levelWrapper);
-				NETWORK_LOGGER.debug("Buffer ["+message.payload.dtoBufferId+"] isSameLevel: ["+isSameLevel+"]");
-				if (!isSameLevel)
-				{
-					return;
-				}
-				
 				
 				Executor executor = ThreadPoolUtil.getFileHandlerExecutor();
 				if (executor != null)
@@ -217,6 +225,15 @@ public class DhClientLevel extends AbstractDhLevel implements IDhClientLevel
 	{
 		try
 		{
+			// only tick the level the player is currently in
+			// (done to prevent ticking LodQuadTree's for levels that aren't rendering)
+			IClientLevelWrapper clientLevelWrapper = MC_CLIENT.getWrappedClientLevel();
+			if (clientLevelWrapper == null 
+				|| clientLevelWrapper.getDhLevel() != this)
+			{
+				return;
+			}
+			
 			this.clientside.clientTick();
 			
 			if (this.syncOnLoadRequestQueue != null)
@@ -331,12 +348,15 @@ public class DhClientLevel extends AbstractDhLevel implements IDhClientLevel
 		String o = MinecraftTextFormat.ORANGE;
 		String y = MinecraftTextFormat.YELLOW;
 		String g = MinecraftTextFormat.GREEN;
+		String r = MinecraftTextFormat.RED;
 		String cf = MinecraftTextFormat.CLEAR_FORMATTING;
 		
 		
 		String dimName = this.levelWrapper.getDhIdentifier();
-		boolean rendering = this.clientside.isRendering();
-		String renderingString = rendering ? (g+"yes"+cf) : (o+"no"+cf);
+		boolean rendering = 
+			this.clientside.isRendering() 
+			&& !IgnoredDimensionCsvHandler.INSTANCE.dimensionNameShouldBeIgnored(dimName);
+		String renderingString = rendering ? (g+"yes"+cf) : (r+"no"+cf);
 		messageList.add("["+y+dimName+cf+"] rendering: "+renderingString);
 		
 		
@@ -396,12 +416,10 @@ public class DhClientLevel extends AbstractDhLevel implements IDhClientLevel
 	//================//
 	//region
 	
-	private static class LodRequestState extends LodRequestModule.AbstractLodRequestState
+	private static class LodRequestState extends AbstractLodRequestState
 	{
 		LodRequestState(DhClientLevel clientLevel, ClientNetworkState networkState)
-		{
-			this.retrievalQueue = new RemoteWorldRetrievalQueue(networkState, clientLevel);
-		}
+		{ super(clientLevel, new RemoteWorldRetrievalQueue(networkState, clientLevel)); }
 	}
 	
 	//endregion

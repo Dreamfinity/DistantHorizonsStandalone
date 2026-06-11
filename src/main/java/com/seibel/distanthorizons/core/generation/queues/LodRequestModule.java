@@ -17,39 +17,35 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.seibel.distanthorizons.core.level;
+package com.seibel.distanthorizons.core.generation.queues;
 
-import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorProgressDisplayLocation;
-import com.seibel.distanthorizons.core.api.internal.ClientApi;
-import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.file.fullDatafile.GeneratedFullDataSourceProvider;
-import com.seibel.distanthorizons.core.generation.IFullDataSourceRetrievalQueue;
+import com.seibel.distanthorizons.core.level.*;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.logging.f3.F3Screen;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
-import com.seibel.distanthorizons.core.util.FormatUtil;
 import com.seibel.distanthorizons.core.util.ThreadUtil;
-import com.seibel.distanthorizons.core.util.objects.RollingAverage;
-import com.seibel.distanthorizons.core.util.threading.PriorityTaskPicker;
-import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
 import com.seibel.distanthorizons.core.world.DhApiWorldProxy;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.io.Closeable;
-import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 /**
  * Handles both single-player/server-side world gen and client side LOD requests.
+ * 
+ * @see AbstractLodRequestState
+ * @see IFullDataSourceRetrievalQueue
  */
 public class LodRequestModule implements Closeable
 {
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
+	
+	private final IDhLevel level;
 	private final GeneratedFullDataSourceProvider.IOnWorldGenCompleteListener onWorldGenCompleteListener;
 	private final ThreadPoolExecutor tickerThread;
 	
@@ -63,6 +59,7 @@ public class LodRequestModule implements Closeable
 	//=============//
 	// constructor //
 	//=============//
+	//region
 	
 	public LodRequestModule(
 			IDhLevel level,
@@ -71,29 +68,50 @@ public class LodRequestModule implements Closeable
 			Supplier<? extends AbstractLodRequestState> worldGenStateSupplier
 		)
 	{
+		this.level = level;
 		this.onWorldGenCompleteListener = onWorldGenCompleteListener;
 		this.dataSourceProvider = dataSourceProvider;
 		this.worldGenStateSupplier = worldGenStateSupplier;
 		
-		String levelId = level.getLevelWrapper().getDhIdentifier();
+		String levelId = this.level.getLevelWrapper().getDhIdentifier();
 		this.tickerThread = ThreadUtil.makeSingleDaemonThreadPool("Request Module Ticker ["+levelId+"]");
 		this.tickerThread.execute(this::tickLoop);
 	}
+	
+	//endregion
 	
 	
 	
 	//=========//
 	// ticking //
 	//=========//
+	//region
 	
 	private void tickLoop()
 	{
 		try
 		{
+			// Initial wait is to prevent an issue
+			// where this starts before the child object's constructor finishes,
+			// causing null pointers on final non-null references.
+			// The try-catch in the while loop should also handle this
+			// but this way we shouldn't have error logs.
+			Thread.sleep(500);
+			
+			// run until the threadpool is shut down
 			while (!Thread.interrupted())
 			{
-				Thread.sleep(20);
-				this.tick();
+				try
+				{
+					Thread.sleep(20);
+					
+					this.tick();
+				}
+				catch (InterruptedException e) { throw e; }
+				catch (Exception e)
+				{
+					LOGGER.error("Unexpected error in [" + LodRequestModule.class.getSimpleName() + "] tick loop, error: [" + e.getMessage() + "].", e);
+				}
 			}
 		}
 		catch (InterruptedException ignore) { }
@@ -101,8 +119,11 @@ public class LodRequestModule implements Closeable
 	private void tick()
 	{
 		boolean shouldDoWorldGen = this.onWorldGenCompleteListener.shouldDoWorldGen();
+		
 		// if the world is read only don't generate anything
-		shouldDoWorldGen &= !DhApiWorldProxy.INSTANCE.getReadOnly();
+		shouldDoWorldGen &= !DhApiWorldProxy.INSTANCE.tryGetReadOnly();
+		
+		
 		
 		boolean isWorldGenRunning = this.isWorldGenRunning();
 		if (shouldDoWorldGen && !isWorldGenRunning)
@@ -130,11 +151,14 @@ public class LodRequestModule implements Closeable
 		}
 	}
 	
+	//endregion
+	
 	
 	
 	//===================//
 	// world gen control //
 	//===================//
+	//region
 	
 	public void startWorldGen(GeneratedFullDataSourceProvider dataFileHandler, AbstractLodRequestState newWgs)
 	{
@@ -168,15 +192,19 @@ public class LodRequestModule implements Closeable
 			}
 		}
 		dataFileHandler.clearRetrievalQueue();
-		worldGenState.closeAsync(true).join(); //TODO: Make it async.
+		// synchronized shutdown necessary to make sure the tasks are all handled correctly
+		worldGenState.closeAsync(true).join();
 		dataFileHandler.removeWorldGenCompleteListener(this.onWorldGenCompleteListener);
 	}
+	
+	//endregion
 	
 	
 	
 	//=======================//
 	// base method overrides //
 	//=======================//
+	//region
 	
 	@Override
 	public void close()
@@ -198,16 +226,20 @@ public class LodRequestModule implements Closeable
 			
 			if (worldGenState != null)
 			{
-				worldGenState.closeAsync(true).join(); //TODO: Make it async.
+				// synchronized shutdown necessary to make sure the tasks are all handled correctly
+				worldGenState.closeAsync(true).join();
 			}
 		}
 	}
+	
+	//endregion
 	
 	
 	
 	//=========//
 	// getters //
 	//=========//
+	//region
 	
 	public boolean isWorldGenRunning() { return this.lodRequestStateRef.get() != null; }
 	
@@ -239,170 +271,7 @@ public class LodRequestModule implements Closeable
 		worldGenState.retrievalQueue.addDebugMenuStringsToList(messageList);
 	}
 	
-	
-	
-	//================//
-	// helper classes //
-	//================//
-	
-	/** Handles the {@link IFullDataSourceRetrievalQueue} and any other necessary world gen information. */
-	public static abstract class AbstractLodRequestState
-	{
-		/** static so we only send the disable message once per session */
-		private static long firstProgressMessageSentMs = 0;
-		
-		public IFullDataSourceRetrievalQueue retrievalQueue;
-		
-		private static final ThreadPoolExecutor PROGRESS_UPDATER_THREAD = ThreadUtil.makeThreadPool(3, "World Gen Progress Updater", Thread.NORM_PRIORITY, true);
-		private boolean progressUpdateThreadRunning = false;
-		
-		
-		
-		/** @param targetPosForRequest the position that world generation should be centered around */
-		public void startRequestQueueAndSetTargetPos(DhBlockPos2D targetPosForRequest) 
-		{ 
-			this.retrievalQueue.startAndSetTargetPos(targetPosForRequest);
-			this.startProgressUpdateThread();
-		}
-		private void startProgressUpdateThread()
-		{
-			// only start the thread once
-			if (!this.progressUpdateThreadRunning)
-			{
-				this.progressUpdateThreadRunning = true;
-				
-				PROGRESS_UPDATER_THREAD.execute(() -> 
-				{
-					while (this.progressUpdateThreadRunning)
-					{
-						try
-						{
-							this.sendRetrievalProgress();
-							
-							// sleep so we only see an update once in a while
-							int sleepTimeInSec = Config.Common.WorldGenerator.generationProgressDisplayIntervalInSeconds.get();
-							Thread.sleep(sleepTimeInSec * 1_000L);
-						}
-						catch (Exception e)
-						{
-							LOGGER.error("Unexpected issue displaying chunk retrieval progress [" + e.getMessage() + "].", e);
-						}
-					}
-				});
-			}
-		}
-		private void sendRetrievalProgress()
-		{
-			// format the remaining chunks
-			int remainingChunkCount = this.retrievalQueue.getRetrievalEstimatedRemainingChunkCount();
-			remainingChunkCount += this.retrievalQueue.getQueuedChunkCount();
-			String remainingChunkCountStr = F3Screen.NUMBER_FORMAT.format(remainingChunkCount);
-			
-			String message = "DH is generating chunks. " + remainingChunkCountStr + " left."; // TODO getting stuck at 32 chunks remaining
-			
-			// show a message about how to disable progress logging if requested
-			int msToShowDisableInstructions = Config.Common.WorldGenerator.generationProgressDisableMessageDisplayTimeInSeconds.get() * 1_000;
-			if (msToShowDisableInstructions > 0)
-			{
-				long timeSinceFirstMessageInMs = (System.currentTimeMillis() - firstProgressMessageSentMs);
-				// always show this message for the first tick
-				if (firstProgressMessageSentMs == 0
-						// show this message if there is still time
-						|| timeSinceFirstMessageInMs < msToShowDisableInstructions)
-				{
-					// append to the current message
-					message += " This message can be hidden in the DH config.";
-				}
-			}
-			
-			// add the remaining time estimate if available
-			double chunksPerSec = this.getEstimatedChunksPerSecond();
-			if (chunksPerSec > 0)
-			{
-				long estimatedRemainingTime = (long) (remainingChunkCount / chunksPerSec);
-				message += " ETA: " + FormatUtil.formatEta(Duration.ofSeconds(estimatedRemainingTime));
-				
-				if (Config.Common.WorldGenerator.generationProgressIncludeChunksPerSecond.get())
-				{
-					message += " at " + F3Screen.NUMBER_FORMAT.format(chunksPerSec) + " chunks/sec";
-				}
-			}
-			
-			// only log if there are chunks needing to be generated
-			if (remainingChunkCount != 0)
-			{
-				// determine where to log
-				EDhApiDistantGeneratorProgressDisplayLocation displayLocation = Config.Common.WorldGenerator.showGenerationProgress.get();
-				if (displayLocation == EDhApiDistantGeneratorProgressDisplayLocation.OVERLAY)
-				{
-					ClientApi.INSTANCE.showOverlayMessageNextFrame(message);
-				}
-				else if (displayLocation == EDhApiDistantGeneratorProgressDisplayLocation.CHAT)
-				{
-					ClientApi.INSTANCE.showChatMessageNextFrame(message);
-				}
-				else if (displayLocation == EDhApiDistantGeneratorProgressDisplayLocation.LOG)
-				{
-					LOGGER.info(message);
-				}
-				
-				
-				// mark when the first message was sent
-				if (firstProgressMessageSentMs == 0)
-				{
-					firstProgressMessageSentMs = System.currentTimeMillis();
-				}
-			}
-		}
-		
-		/** @return -1 if this method isn't supported or available */
-		public double getEstimatedChunksPerSecond()
-		{
-			RollingAverage avg = this.retrievalQueue.getRollingAverageChunkGenTimeInMs();
-			if (avg == null)
-			{
-				return -1;
-			}
-			
-			
-			PriorityTaskPicker.Executor executor = ThreadPoolUtil.getWorldGenExecutor();
-			int threadCount = 1;
-			if (executor != null)
-			{
-				threadCount = executor.getPoolSize();
-			}
-			
-			// convert chunk generation time in milliseconds to chunks per second
-			double chunksPerSecond = (1 / avg.getAverage()) * 1_000;
-			// estimate the number of chunks that can be processed per second by all threads
-			// Note: this is probably higher than the actual number, we might want to drop this by 1 or 2 to give a more realistic estimate
-			chunksPerSecond = threadCount * chunksPerSecond;
-			
-			return chunksPerSecond;
-		}
-		
-		
-		CompletableFuture<Void> closeAsync(boolean doInterrupt)
-		{
-			// this should stop the updater thread
-			this.progressUpdateThreadRunning = false;
-			
-			return this.retrievalQueue.startClosingAsync(true, doInterrupt)
-					.exceptionally(e ->
-							{
-								LOGGER.error("Error during first stage of generation queue shutdown, Error: ["+e.getMessage()+"].", e);
-								return null;
-							}
-					).thenRun(this.retrievalQueue::close)
-					.exceptionally(e ->
-					{
-						LOGGER.error("Error during second stage of generation queue shutdown, Error: ["+e.getMessage()+"].", e);
-						return null;
-					});
-		}
-		
-		
-	}
+	//endregion
 	
 	
 	

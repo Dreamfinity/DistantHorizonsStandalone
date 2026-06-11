@@ -39,15 +39,15 @@ import com.seibel.distanthorizons.core.util.DhApiTerrainDataPointUtil;
 import com.seibel.distanthorizons.core.util.FullDataPointUtil;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.RayCastUtil;
-import com.seibel.distanthorizons.core.util.math.Vec3f;
+import com.seibel.distanthorizons.core.util.math.DhVec3f;
 import com.seibel.distanthorizons.core.world.AbstractDhWorld;
 import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import com.seibel.distanthorizons.coreapi.util.BitShiftUtil;
-import com.seibel.distanthorizons.core.util.math.Vec3d;
-import com.seibel.distanthorizons.core.util.math.Vec3i;
+import com.seibel.distanthorizons.core.util.math.DhVec3d;
+import com.seibel.distanthorizons.core.util.math.DhVec3i;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
@@ -71,24 +71,28 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 	// debugging values
 	private static volatile boolean debugThreadRunning = false;
 	private static DhApiTerrainDataCache debugDataCache = new DhApiTerrainDataCache();
-	private static DhApiVec3i currentDebugVec3i = new Vec3i();
+	private static DhApiVec3i currentDebugVec3i = new DhVec3i();
 	
 	
 	
 	//=============//
 	// constructor //
 	//=============//
+	//region
 	
 	private DhApiTerrainDataRepo()
 	{
 		
 	}
 	
+	//endregion
+	
 	
 	
 	//================//
 	// Getter Methods //
 	//================//
+	//region
 	
 	@Override
 	public DhApiResult<DhApiTerrainDataPoint> getSingleDataPointAtBlockPos(IDhApiLevelWrapper levelWrapper, int blockPosX, int blockPosY, int blockPosZ, IDhApiTerrainDataCache dataCache)
@@ -109,9 +113,12 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 	public DhApiResult<DhApiTerrainDataPoint[][][]> getAllTerrainDataAtDetailLevelAndPos(IDhApiLevelWrapper levelWrapper, byte detailLevel, int posX, int posZ, IDhApiTerrainDataCache dataCache)
 	{ return getTerrainDataOverAreaForPositionDetailLevel(levelWrapper, DhSectionPos.encode(detailLevel, posX, posZ), dataCache); }
 	
+	//endregion
+	
 	
 	
 	// private getters //
+	//region
 	
 	/** Returns a single API terrain datapoint that contains the given Y block position */
 	private static DhApiResult<DhApiTerrainDataPoint> getTerrainDataAtBlockYPos(IDhApiLevelWrapper levelWrapper, long requestedColumnPos, Integer blockYPos, IDhApiTerrainDataCache dataCache)
@@ -340,11 +347,14 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 		}
 	}
 	
+	//endregion
+	
 	
 	
 	//====================//
 	// raycasting methods //
 	//====================//
+	//region
 	
 	@Override
 	public DhApiResult<DhApiRaycastResult> raycast(
@@ -356,8 +366,8 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 			IDhApiTerrainDataCache dataCache)
 	{
 		return this.raycastLodData(levelWrapper, 
-				new Vec3d(rayOriginX, rayOriginY, rayOriginZ), 
-				new Vec3f(rayDirectionX, rayDirectionY, rayDirectionZ), 
+				new DhVec3d(rayOriginX, rayOriginY, rayOriginZ), 
+				new DhVec3f(rayDirectionX, rayDirectionY, rayDirectionZ), 
 				maxRayBlockLength, dataCache);
 	}
 	
@@ -369,7 +379,7 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 	 */
 	private DhApiResult<DhApiRaycastResult> raycastLodData(
 			IDhApiLevelWrapper levelWrapper, 
-			Vec3d rayOrigin, Vec3f rayDirection, 
+			DhVec3d rayOrigin, DhVec3f rayDirection, 
 			int maxRayBlockLength,
 			@Nullable
 			IDhApiTerrainDataCache dataCache)
@@ -386,9 +396,9 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 		int currentLength = 0;
 		
 		// the exact position of this step
-		Vec3d exactPos = new Vec3d(rayOrigin.x, rayOrigin.y, rayOrigin.z);
+		DhVec3d exactPos = new DhVec3d(rayOrigin.x, rayOrigin.y, rayOrigin.z);
 		// the block position for this step
-		Vec3i blockPos = new Vec3i((int) Math.round(rayOrigin.x), (int) Math.round(rayOrigin.y), (int) Math.round(rayOrigin.z));
+		DhVec3i blockPos = new DhVec3i((int) Math.round(rayOrigin.x), (int) Math.round(rayOrigin.y), (int) Math.round(rayOrigin.z));
 		
 		DhApiRaycastResult closetFoundDataPoint = null;
 		
@@ -398,8 +408,8 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 				&& currentLength <= maxRayBlockLength)
 		{
 			// get the LOD columns around this position
-			ArrayList<Vec3i> columnPositions = getIntersectingColumnsAtPosition(blockPos, rayDirection);
-			for (Vec3i columnPos : columnPositions)
+			ArrayList<DhVec3i> columnPositions = getIntersectingColumnsAtPosition(blockPos, rayDirection);
+			for (DhVec3i columnPos : columnPositions)
 			{
 				// check each column
 				DhApiResult<DhApiTerrainDataPoint[]> result = this.getColumnDataAtBlockPos(levelWrapper, columnPos.x, columnPos.z, dataCache);
@@ -416,7 +426,7 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 					if (dataPoint.blockStateWrapper != null && !dataPoint.blockStateWrapper.isAir())
 					{
 						// does this LOD contain the given Y position?
-						Vec3i dataPointPos = new Vec3i(columnPos.x, dataPoint.bottomYBlockPos, columnPos.z);
+						DhVec3i dataPointPos = new DhVec3i(columnPos.x, dataPoint.bottomYBlockPos, columnPos.z);
 						if (exactPos.y >= dataPoint.bottomYBlockPos 
 							&& exactPos.y <= dataPoint.topYBlockPos)
 						{
@@ -469,15 +479,15 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 	 *
 	 * Used to make sure the raycast step doesn't accidentally walk over any adjacent data.
 	 */
-	private static ArrayList<Vec3i> getIntersectingColumnsAtPosition(Vec3i rayEndingPos, Vec3f rayDirection)
+	private static ArrayList<DhVec3i> getIntersectingColumnsAtPosition(DhVec3i rayEndingPos, DhVec3f rayDirection)
 	{
-		ArrayList<Vec3i> returnList = new ArrayList<>(9);
+		ArrayList<DhVec3i> returnList = new ArrayList<>(9);
 		
 		for (int x = -1; x <= 1; x++)
 		{
 			for (int z = -1; z <= 1; z++)
 			{
-				Vec3i pos = new Vec3i(rayEndingPos.x + x, rayEndingPos.y, rayEndingPos.z + z);
+				DhVec3i pos = new DhVec3i(rayEndingPos.x + x, rayEndingPos.y, rayEndingPos.z + z);
 				
 				// check if this column is intersected by the ray
 				if (RayCastUtil.rayIntersectsSquare(rayEndingPos.x, rayEndingPos.z, rayDirection.x, rayDirection.z, pos.x, pos.z, 1))
@@ -490,11 +500,14 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 		return returnList;
 	}
 	
+	//endregion
+	
 	
 	
 	//================//
 	// setter methods //
 	//================//
+	//region
 	
 	@Override
 	public DhApiResult<Void> overwriteChunkDataAsync(IDhApiLevelWrapper levelWrapper, Object[] chunkObjectArray) throws ClassCastException
@@ -524,20 +537,26 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 		return DhApiResult.createSuccess();
 	}
 	
+	//endregion
+	
 	
 	
 	//=============//
 	// API helpers //
 	//=============//
+	//region
 	
 	@Override
 	public IDhApiTerrainDataCache createSoftCache() { return new DhApiTerrainDataCache(); }
+	
+	//endregion
 	
 	
 	
 	//===============//
 	// debug methods //
 	//===============//
+	//region
 	
 	/**
 	 * This method is here for debugging the repo and isn't intended for normal use.
@@ -617,6 +636,9 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 			thread.start();
 		}
 	}
+	
+	//endregion
+	
 	
 	
 }

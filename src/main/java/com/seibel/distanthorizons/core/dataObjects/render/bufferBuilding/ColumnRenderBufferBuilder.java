@@ -31,7 +31,7 @@ import com.seibel.distanthorizons.core.util.objects.pooling.PhantomArrayListChec
 import com.seibel.distanthorizons.core.util.objects.pooling.PhantomArrayListPool;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
-import com.seibel.distanthorizons.core.util.ColorUtil;
+import com.seibel.distanthorizons.coreapi.util.ColorUtil;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnRenderView;
@@ -55,26 +55,6 @@ public class ColumnRenderBufferBuilder
 	// vbo building //
 	//==============//
 	
-	/** @link adjData should be null for adjacent sections that cross detail level boundaries */
-	public static CompletableFuture<LodBufferContainer> uploadBuffersAsync(
-			IDhClientLevel clientLevel,
-			long pos,
-			LodQuadBuilder quadBuilder
-		)
-	{
-		DhBlockPos minBlockPos = new DhBlockPos(DhSectionPos.getMinCornerBlockX(pos), clientLevel.getLevelWrapper().getMinHeight(), DhSectionPos.getMinCornerBlockZ(pos));
-		LodBufferContainer bufferContainer = new LodBufferContainer(pos, minBlockPos);
-		CompletableFuture<LodBufferContainer> uploadFuture = bufferContainer.makeAndUploadBuffersAsync(quadBuilder);
-		uploadFuture.whenComplete((uploadedBuffer, exception) -> 
-		{
-			// clean up if not uploaded
-			if (uploadedBuffer != null && !uploadedBuffer.buffersUploaded)
-			{
-				uploadedBuffer.close();
-			}
-		});
-		return uploadFuture;
-	}
 	public static void makeLodRenderData(
 			LodQuadBuilder quadBuilder, ColumnRenderSource renderSource, IDhClientLevel clientLevel,
 			ColumnRenderSource[] adjRegions, boolean[] isSameDetailLevel)
@@ -328,7 +308,7 @@ public class ColumnRenderBufferBuilder
 		
 		int color;
 		boolean fullBright = false;
-		EDhApiDebugRendering debugging = Config.Client.Advanced.Debugging.debugRendering.get();
+		EDhApiDebugRendering debugging = Config.Client.Advanced.Debugging.debugRenderingColors.get();
 		switch (debugging)
 		{
 			case OFF:

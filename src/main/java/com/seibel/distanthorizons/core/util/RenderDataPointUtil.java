@@ -24,6 +24,7 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.coreapi.util.ColorUtil;
 
 
 /**
@@ -246,10 +247,7 @@ public class RenderDataPointUtil
 		{
 			return "Y+:" + getYMax(dataPoint) +
 					" Y-:" + getYMin(dataPoint) +
-					" argb:" + getAlpha(dataPoint) + " " +
-					getRed(dataPoint) + " " +
-					getGreen(dataPoint) + " " +
-					getBlue(dataPoint) +
+					" argb:" + getAlpha(dataPoint) + "," + getRed(dataPoint) + "," + getGreen(dataPoint) + "," + getBlue(dataPoint) +
 					" BL:" + getLightBlock(dataPoint) +
 					" SL:" + getLightSky(dataPoint) +
 					" MAT:" + getBlockMaterialId(dataPoint) + "["+ EDhApiBlockMaterial.getFromIndex(getBlockMaterialId(dataPoint))+"]";

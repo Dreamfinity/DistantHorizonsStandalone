@@ -151,8 +151,7 @@ public abstract class AbstractFullDataNetworkRequestQueue implements IDebugRende
 	
 	public synchronized boolean tick(DhBlockPos2D targetPos)
 	{
-		if (DhApiWorldProxy.INSTANCE.worldLoaded() 
-			&& DhApiWorldProxy.INSTANCE.getReadOnly())
+		if (DhApiWorldProxy.INSTANCE.tryGetReadOnly())
 		{
 			return false;
 		}
@@ -245,7 +244,6 @@ public abstract class AbstractFullDataNetworkRequestQueue implements IDebugRende
 			if (response.payload == null)
 			{
 				LodUtil.assertTrue(this.changedOnly, "Received empty data source response for not changes-only request");
-                requestTask.future.cancel(false);
 				return;
 			}
 			

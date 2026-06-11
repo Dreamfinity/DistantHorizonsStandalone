@@ -17,7 +17,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.seibel.distanthorizons.core.generation;
+package com.seibel.distanthorizons.core.generation.queues;
 
 import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
 import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
@@ -27,6 +27,7 @@ import com.seibel.distanthorizons.api.objects.data.IDhApiFullDataSource;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.file.fullDatafile.V2.FullDataSourceProviderV2;
+import com.seibel.distanthorizons.core.generation.DhLightingEngine;
 import com.seibel.distanthorizons.core.generation.tasks.DataSourceRetrievalResult;
 import com.seibel.distanthorizons.core.generation.tasks.DataSourceRetrievalTask;
 import com.seibel.distanthorizons.core.level.IDhServerLevel;
@@ -201,7 +202,7 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 	private synchronized void tryQueueNewWorldGenRequestsAsync()
 	{
 		if (!DhApiWorldProxy.INSTANCE.worldLoaded()
-			|| DhApiWorldProxy.INSTANCE.getReadOnly())
+			|| DhApiWorldProxy.INSTANCE.tryGetReadOnly())
 		{
 			return;
 		}
@@ -591,6 +592,8 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 	
 	@Override public byte lowestDataDetail() { return this.lowestDataDetail; }
 	@Override public byte highestDataDetail() { return this.highestDataDetail; }
+	
+	@Override public String getRetrievalTypeName() { return "generating chunks"; }
 	
 	@Override public int getEstimatedRemainingTaskCount() { return this.estimatedRemainingTaskCount; }
 	@Override public void setEstimatedRemainingTaskCount(int newEstimate) { this.estimatedRemainingTaskCount = newEstimate; }

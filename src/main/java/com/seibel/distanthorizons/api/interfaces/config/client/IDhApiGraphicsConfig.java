@@ -85,6 +85,18 @@ public interface IDhApiGraphicsConfig extends IDhApiConfigGroup
 	/** Modifies the quadratic function fake chunks use for horizontal quality drop-off. */
 	IDhApiConfigValue<EDhApiHorizontalQuality> horizontalQuality();
 	
+	/** 
+	 * If true DH will try to use the camera position when
+	 * determining LOD quality drop-off. <br>
+	 * If false DH will use the player's position.
+	 * <br><br>
+	 * Enabling helps free-cam mods render correctly. <br>
+	 * Disabling helps multi-camera mods render correctly (ie Immersive Portals or camera mods).
+	 * 
+	 * @since API 7.0.0
+	 */
+	IDhApiConfigValue<Boolean> useCameraPositionForQualityDropOff();
+	
 	IDhApiConfigValue<EDhApiTransparency> transparency();
 	
 	/** Defines what blocks won't be rendered as LODs. */

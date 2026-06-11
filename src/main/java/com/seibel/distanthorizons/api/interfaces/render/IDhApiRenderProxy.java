@@ -19,6 +19,9 @@
 
 package com.seibel.distanthorizons.api.interfaces.render;
 
+import com.seibel.distanthorizons.api.enums.config.EDhApiRenderingApi;
+import com.seibel.distanthorizons.api.enums.config.EDhApiRenderingEngine;
+import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiAfterDhInitEvent;
 import com.seibel.distanthorizons.api.objects.DhApiResult;
 
 
@@ -44,6 +47,33 @@ public interface IDhApiRenderProxy
 	 */
 	DhApiResult<Boolean> clearRenderDataCache();
 	
+	/**
+	 * Returns which specific {@link EDhApiRenderingApi}
+	 * Distant Horizons will use for rendering. <br><br>
+	 * 
+	 * @throws IllegalStateException if no renderer has been bound yet, 
+	 *      wait till after {@link DhApiAfterDhInitEvent} has been fired
+	 * 
+	 * @see DhApiAfterDhInitEvent
+	 * @since API 7.0.0
+	 */
+	EDhApiRenderingApi getRenderingApi() throws IllegalStateException;
+	/**
+	 * Returns true if the current renderer
+	 * is calling the base rendering API's method calls. <br>
+	 * ie GL.drawArrays() for OpenGL. <Br><br>
+	 *
+	 * If DH is using a rendering interpretation layer like Blaze3D (Mojang's rendering API) 
+	 * this will return false.
+	 *
+	 * @throws IllegalStateException if no renderer has been bound yet, 
+	 *      wait till after {@link DhApiAfterDhInitEvent} has been fired
+	 *
+	 * @see DhApiAfterDhInitEvent
+	 * @since API 7.0.0
+	 */
+	boolean isNativeRenderer() throws IllegalStateException;
+	
 	
 	
 	//=======================//
@@ -51,14 +81,16 @@ public interface IDhApiRenderProxy
 	//=======================//
 	
 	/**
-	 * Returns the name of Distant Horizons' depth texture. <br>
-	 * Will return {@link DhApiResult#success} = false and {@link DhApiResult#payload} = -1 if the texture hasn't been created yet.
+	 * Returns the OpenGL name of Distant Horizons' depth texture. <br>
+	 * Will return {@link DhApiResult#success} = false and {@link DhApiResult#payload} = -1 if the texture hasn't been created yet
+	 * or a rendering API other than OpenGL is in use.
 	 */
 	DhApiResult<Integer> getDhDepthTextureId();
 	
 	/**
-	 * Returns the name of Distant Horizons' color texture. <br>
-	 * Will return {@link DhApiResult#success} = false and {@link DhApiResult#payload} = -1 if the texture hasn't been created yet.
+	 * Returns the OpenGL name of Distant Horizons' color texture. <br>
+	 * Will return {@link DhApiResult#success} = false and {@link DhApiResult#payload} = -1 if the texture hasn't been created yet
+	 * or a rendering API other than OpenGL is in use
 	 */
 	DhApiResult<Integer> getDhColorTextureId();
 	

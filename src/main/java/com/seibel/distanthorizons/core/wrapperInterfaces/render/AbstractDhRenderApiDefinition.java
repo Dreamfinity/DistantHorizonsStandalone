@@ -1,6 +1,10 @@
 package com.seibel.distanthorizons.core.wrapperInterfaces.render;
 
+import com.seibel.distanthorizons.api.enums.config.EDhApiRenderingApi;
+import com.seibel.distanthorizons.api.enums.config.EDhApiRenderingEngine;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.jar.EPlatform;
+import com.seibel.distanthorizons.core.render.EDhRenderDepth;
 import com.seibel.distanthorizons.core.render.renderer.AbstractDebugWireframeRenderer;
 import com.seibel.distanthorizons.core.wrapperInterfaces.render.objects.IDhGenericObjectVertexBufferContainer;
 import com.seibel.distanthorizons.core.wrapperInterfaces.render.objects.ILodContainerUniformBufferWrapper;
@@ -16,7 +20,29 @@ public abstract class AbstractDhRenderApiDefinition implements IBindable
 	//region
 	
 	/** Used for debugging */
-	public abstract String getApiName();
+	public abstract String getEngineName();
+	
+	private final boolean useSingleIbo = (EPlatform.get() != EPlatform.MACOS);
+	/**
+	 * Mac has a problem where binding an IBO that's longer than the VBO
+	 * can cause OpenGL to render past the end of the VBO, throwing random junk
+	 * on the screen. <br>
+	 * To fix this we have to use individual IBOs for each VBO, which
+	 * is slower due to having to construct new IBOs.
+	 */
+	public boolean useSingleIbo() { return this.useSingleIbo; }
+	
+	public abstract EDhRenderDepth getRenderDepth();
+	public abstract EDhApiRenderingApi getRenderApi();
+	/** 
+	 * Returns true if the current renderer
+	 * is calling the base rendering API's method calls. <br>
+	 * ie GL.drawArrays() for OpenGL. <Br><br>
+	 *
+	 * If DH is using Blaze3D (Mojang's rendering API) 
+	 * this will return false.
+	 */
+	public abstract boolean isNativeRenderer();
 	
 	//endregion
 	
@@ -36,6 +62,11 @@ public abstract class AbstractDhRenderApiDefinition implements IBindable
 	public abstract IDhVanillaFadeRenderer getVanillaFadeRenderer();
 	public abstract IDhTestTriangleRenderer getTestTriangleRenderer();
 	
+	/** 
+	 * this will NOT run on the render thread.
+	 * Render thread setup tasks should be handled
+	 * during the first rendered frame.
+	 */
 	public void bindRenderers()
 	{
 		SingletonInjector.INSTANCE.bind(AbstractDhRenderApiDefinition.class, this);

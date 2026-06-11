@@ -32,6 +32,7 @@ import com.seibel.distanthorizons.core.level.IDhLevel;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
 import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.render.RenderThreadTaskHandler;
 import com.seibel.distanthorizons.core.render.renderer.AbstractDebugWireframeRenderer;
 import com.seibel.distanthorizons.core.sql.repo.AbstractDhRepo;
 import com.seibel.distanthorizons.core.util.objects.Pair;
@@ -73,7 +74,6 @@ public class SharedApi
 	//region
 	
 	private SharedApi() { }
-	public static void init() { Initializer.init(); }
 	
 	//endregion
 	
@@ -122,6 +122,8 @@ public class SharedApi
 				AbstractDhRepo.closeAllConnections();
 				// needs to be closed on world shutdown to clear out un-processed chunks
 				WORLD_CHUNK_UPDATE_MANAGER.clear();
+				
+				RenderThreadTaskHandler.INSTANCE.clearDebugStats();
 				
 				// recommend that the garbage collector cleans up any objects from the old world and thread pools
 				System.gc();
@@ -209,7 +211,7 @@ public class SharedApi
 		}
 		
 		// ignore updates if the world is read-only
-		if (DhApiWorldProxy.INSTANCE.getReadOnly())
+		if (DhApiWorldProxy.INSTANCE.tryGetReadOnly())
 		{
 			return;
 		}

@@ -60,7 +60,7 @@ public class ThreadPoolUtil
 	public static PriorityTaskPicker.Executor getWorldGenExecutor() { return worldGenThreadPool; }
 	
 	public static final String CLEANUP_THREAD_NAME = "Cleanup";
-	private static final ThreadPoolExecutor cleanupThreadPool = ThreadUtil.makeSingleThreadPool(CLEANUP_THREAD_NAME);
+	private static final ThreadPoolExecutor cleanupThreadPool = ThreadUtil.makeSingleDaemonThreadPool(CLEANUP_THREAD_NAME);
 	/** not null since cleanup always needs to be run even when DH has been shut down */
 	@NotNull
 	public static ThreadPoolExecutor getCleanupExecutor() { return cleanupThreadPool; }
@@ -170,7 +170,7 @@ public class ThreadPoolUtil
 	 */
 	public static boolean worldGenThreadsCanRun()
 	{
-		double cameraSpeed = ClientApi.INSTANCE.cameraSpeedRollingAverage.getAverage();
+		double cameraSpeed = ClientApi.INSTANCE.getAvgCameraSpeed();
 		// stop these threads if moving a little bit slower than max elytra speed
 		double maxAllowedSpeed = (LodUtil.ROCKET_ELYTRA_SPEED_IN_BLOCKS_PER_SEC - 10.0);
 		if (cameraSpeed > maxAllowedSpeed)
@@ -178,6 +178,15 @@ public class ThreadPoolUtil
 			// pause if the user is moving too fast
 			return false;
 		}
+		
+		//PriorityTaskPicker.Executor executor = getRenderLoadingExecutor();
+		//if (executor != null
+		//	&& executor.getQueueSize() > 0)
+		//{
+		//	// pause if LODs are being loaded for rendering
+		//	return false;
+		//}
+		
 		return true;
 	}
 	

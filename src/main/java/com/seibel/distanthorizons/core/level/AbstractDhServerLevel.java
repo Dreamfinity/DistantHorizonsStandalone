@@ -9,7 +9,6 @@ import com.seibel.distanthorizons.core.multiplayer.server.FullDataSourceRequestH
 import com.seibel.distanthorizons.core.multiplayer.server.ServerPlayerState;
 import com.seibel.distanthorizons.core.multiplayer.server.ServerPlayerStateManager;
 import com.seibel.distanthorizons.core.network.exceptions.RequestOutOfRangeException;
-import com.seibel.distanthorizons.core.network.exceptions.RequestRejectedException;
 import com.seibel.distanthorizons.core.network.exceptions.SectionRequiresSplittingException;
 import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
 import com.seibel.distanthorizons.core.network.messages.AbstractTrackableMessage;
@@ -22,14 +21,14 @@ import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.WorldGenUtil;
-import com.seibel.distanthorizons.core.util.math.Vec3d;
+import com.seibel.distanthorizons.core.util.math.DhVec3d;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 
-import javax.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
@@ -72,9 +71,11 @@ public abstract class AbstractDhServerLevel extends AbstractDhLevel implements I
 			boolean runRepoReliantSetup
 		) throws SQLException, IOException
 	{
-		if (saveStructure.getSaveFolder(serverLevelWrapper).mkdirs())
+		File saveFolder = saveStructure.getSaveFolder(serverLevelWrapper);
+		saveFolder.mkdirs();
+		if (!saveFolder.exists())
 		{
-			LOGGER.warn("unable to create data folder.");
+			throw new IOException("unable to create save folder at ["+saveFolder.getPath()+"]. If you're on Windows you may need to enable long file paths.");
 		}
 		this.serverLevelWrapper = serverLevelWrapper;
 		this.serverside = new ServerLevelModule(this, saveStructure);
@@ -114,7 +115,7 @@ public abstract class AbstractDhServerLevel extends AbstractDhLevel implements I
 		this.worldGenPlayerCenteringQueue.add(firstPlayer);
 		this.worldGenPlayerCenteringQueue.remove(firstPlayer);
 		
-		Vec3d position = firstPlayer.getPosition();
+		DhVec3d position = firstPlayer.getPosition();
 		return new DhBlockPos2D((int) position.x, (int) position.z);
 	}
 	
@@ -133,7 +134,7 @@ public abstract class AbstractDhServerLevel extends AbstractDhLevel implements I
 				return;
 			}
 			
-			Vec3d playerPosition = serverPlayerState.getServerPlayer().getPosition();
+			DhVec3d playerPosition = serverPlayerState.getServerPlayer().getPosition();
 			int distanceFromPlayer = DhSectionPos.getChebyshevSignedBlockDistance(message.sectionPos, new DhBlockPos2D((int) playerPosition.x, (int) playerPosition.z)) / 16;
 			
 			ServerPlayerState.RateLimiterSet rateLimiterSet = serverPlayerState.getRateLimiterSet(this);
@@ -200,26 +201,6 @@ public abstract class AbstractDhServerLevel extends AbstractDhLevel implements I
 		
 		LodUtil.assertTrue(message.getSession().serverPlayer != null);
 		
-		// Check if the player is in this dimension,
-		// since handling multiple dimensions isn't allowed
-		if (message.getSession().serverPlayer.getLevel() != this.getLevelWrapper())
-		{
-			// If the message can be replied to - reply with an error, otherwise just ignore
-			if (message instanceof AbstractTrackableMessage)
-			{
-				((AbstractTrackableMessage) message).sendResponse(
-						new RequestRejectedException(
-								"Generation not allowed. " +
-										"Requested dimension: ["+((ILevelRelatedMessage) message).getLevelName()+"], " +
-										"player dimension: [" + message.getSession().serverPlayer.getLevel().getDhIdentifier() + "], " +
-										"handler dimension: [" + this.getLevelWrapper().getDhIdentifier() + "]"
-						)
-				);
-			}
-			
-			return false;
-		}
-		
 		return true;
 	}
 	
@@ -270,7 +251,7 @@ public abstract class AbstractDhServerLevel extends AbstractDhLevel implements I
 						continue;
 					}
 					
-					Vec3d playerPosition = serverPlayerState.getServerPlayer().getPosition();
+					DhVec3d playerPosition = serverPlayerState.getServerPlayer().getPosition();
 					int distanceFromPlayer = DhSectionPos.getChebyshevSignedBlockDistance(data.getPos(), new DhBlockPos2D((int) playerPosition.x, (int) playerPosition.z)) / 16;
 					if (distanceFromPlayer <= serverPlayerState.sessionConfig.getMaxUpdateDistanceRadius())
 					{

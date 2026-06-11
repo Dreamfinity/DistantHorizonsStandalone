@@ -29,8 +29,10 @@ import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
 import com.seibel.distanthorizons.core.render.QuadTree.LodQuadTree;
 import com.seibel.distanthorizons.core.render.RenderBufferHandler;
 import com.seibel.distanthorizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.util.math.DhVec3d;
 import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.render.renderPass.IDhGenericRenderer;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
@@ -44,6 +46,7 @@ public class ClientLevelModule implements Closeable, IDataSourceUpdateListenerFu
 {
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	private static final IMinecraftClientWrapper MC_CLIENT = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
+	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	private static final IWrapperFactory WRAPPER_FACTORY = SingletonInjector.INSTANCE.get(IWrapperFactory.class);
 	
 	private final IDhClientLevel clientLevel;
@@ -106,7 +109,21 @@ public class ClientLevelModule implements Closeable, IDataSourceUpdateListenerFu
 			this.ClientRenderStateRef.set(clientRenderState);
 		}
 		
-		clientRenderState.quadtree.tryTick(new DhBlockPos2D(MC_CLIENT.getPlayerBlockPos()));
+		
+		DhBlockPos2D quadTreeTickBlockPos;
+		if (Config.Client.Advanced.Graphics.Quality.useCameraPositionForQualityDropOff.get())
+		{
+			// use camera position allow free cam mods work better
+			DhVec3d cameraDoublePos = MC_RENDER.getCameraExactPosition();
+			quadTreeTickBlockPos = new DhBlockPos2D((int)cameraDoublePos.x, (int)cameraDoublePos.z);
+		}
+		else
+		{
+			// player position allows multi-cam mods to work better
+			quadTreeTickBlockPos = new DhBlockPos2D(MC_CLIENT.getPlayerBlockPos());
+		}
+		
+		clientRenderState.quadtree.tryTick(quadTreeTickBlockPos);
 	}
 	
 	
@@ -120,7 +137,7 @@ public class ClientLevelModule implements Closeable, IDataSourceUpdateListenerFu
 		ClientRenderState clientRenderState = new ClientRenderState(this.clientLevel, this.clientLevel.getFullDataProvider());
 		if (!this.ClientRenderStateRef.compareAndSet(null, clientRenderState))
 		{
-			LOGGER.warn("Renderer already started for ["+this+"].");
+			LOGGER.warn("Renderer already started for ["+this.clientLevel.getClientLevelWrapper()+"].");
 			clientRenderState.close();
 		}
 	}
@@ -170,6 +187,7 @@ public class ClientLevelModule implements Closeable, IDataSourceUpdateListenerFu
 		}
 		
 		this.fullDataSourceProvider.removeDataSourceUpdateListener(this);
+		this.genericRenderer.close();
 	}
 	
 	
@@ -259,7 +277,7 @@ public class ClientLevelModule implements Closeable, IDataSourceUpdateListenerFu
 		@Override
 		public void close()
 		{
-			LOGGER.info("Shutting down " + ClientRenderState.class.getSimpleName());
+			//LOGGER.info("Shutting down " + ClientRenderState.class.getSimpleName());
 			this.quadtree.close();
 		}
 		

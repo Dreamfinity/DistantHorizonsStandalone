@@ -19,13 +19,10 @@
 
 package com.seibel.distanthorizons.core.api.internal;
 
-import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiLevelLoadEvent;
-import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiLevelUnloadEvent;
 import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
 import com.seibel.distanthorizons.core.network.messages.MessageRegistry;
 import com.seibel.distanthorizons.core.world.*;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
-import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
@@ -77,7 +74,6 @@ public class ServerApi
 	}
 	
 	
-	
 	//==============//
 	// level events //
 	//==============//
@@ -90,7 +86,6 @@ public class ServerApi
 		if (serverWorld != null)
 		{
 			serverWorld.getOrLoadLevel(levelWrapper);
-			ApiEventInjector.INSTANCE.fireAllEvents(DhApiLevelLoadEvent.class, new DhApiLevelLoadEvent.EventParam(levelWrapper));
 		}
 	}
 	public void serverLevelUnloadEvent(IServerLevelWrapper level)
@@ -101,10 +96,8 @@ public class ServerApi
 		if (serverWorld != null)
 		{
 			serverWorld.unloadLevel(level);
-			ApiEventInjector.INSTANCE.fireAllEvents(DhApiLevelUnloadEvent.class, new DhApiLevelUnloadEvent.EventParam(level));
 		}
 	}
-	
 	
 	
 	//=======================//
@@ -122,7 +115,7 @@ public class ServerApi
 	
 	public void serverPlayerJoinEvent(IServerPlayerWrapper player)
 	{
-		if (DhApiWorldProxy.INSTANCE.worldLoaded() && DhApiWorldProxy.INSTANCE.getReadOnly())
+		if (DhApiWorldProxy.INSTANCE.tryGetReadOnly())
 		{
 			return;
 		}
@@ -136,7 +129,7 @@ public class ServerApi
 	}
 	public void serverPlayerDisconnectEvent(IServerPlayerWrapper player)
 	{
-		if (DhApiWorldProxy.INSTANCE.worldLoaded() && DhApiWorldProxy.INSTANCE.getReadOnly())
+		if (DhApiWorldProxy.INSTANCE.tryGetReadOnly())
 		{
 			return;
 		}
@@ -150,7 +143,7 @@ public class ServerApi
 	}
 	public void serverPlayerLevelChangeEvent(IServerPlayerWrapper player, IServerLevelWrapper originLevel, IServerLevelWrapper destinationLevel)
 	{
-		if (DhApiWorldProxy.INSTANCE.worldLoaded() && DhApiWorldProxy.INSTANCE.getReadOnly())
+		if (DhApiWorldProxy.INSTANCE.tryGetReadOnly())
 		{
 			return;
 		}
@@ -170,7 +163,7 @@ public class ServerApi
 	 */
 	public void pluginMessageReceived(IServerPlayerWrapper player, @NotNull AbstractNetworkMessage message)
 	{
-		if (DhApiWorldProxy.INSTANCE.worldLoaded() && DhApiWorldProxy.INSTANCE.getReadOnly())
+		if (DhApiWorldProxy.INSTANCE.tryGetReadOnly())
 		{
 			return;
 		}

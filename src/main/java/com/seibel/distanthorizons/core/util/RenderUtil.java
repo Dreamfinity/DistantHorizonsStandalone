@@ -19,15 +19,21 @@
 
 package com.seibel.distanthorizons.core.util;
 
+import com.seibel.distanthorizons.api.DhApi;
 import com.seibel.distanthorizons.api.objects.math.DhApiMat4f;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
 import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.render.EDhRenderDepth;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IIrisAccessor;
+import com.seibel.distanthorizons.core.wrapperInterfaces.render.AbstractDhRenderApiDefinition;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.coreapi.util.MathUtil;
-import com.seibel.distanthorizons.core.util.math.Mat4f;
 
 /**
  * This holds miscellaneous helper code
@@ -35,8 +41,12 @@ import com.seibel.distanthorizons.core.util.math.Mat4f;
  */
 public class RenderUtil
 {
+	private static final DhLogger LOGGER = new DhLoggerBuilder().maxCountPerSecond(1).build();
+	
 	private static final IMinecraftClientWrapper MC = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
+	private static final IIrisAccessor IRIS_ACCESSOR = ModAccessorInjector.INSTANCE.get(IIrisAccessor.class);
+	private static final AbstractDhRenderApiDefinition RENDER_API_DEF = SingletonInjector.INSTANCE.get(AbstractDhRenderApiDefinition.class);
 	
 	/** 
 	 * all speeds are measured in blocks per second 
@@ -65,7 +75,7 @@ public class RenderUtil
 	 *
 	 * @param mcProjMat Minecraft's current projection matrix
 	 */
-	public static Mat4f createLodProjectionMatrix(DhApiMat4f mcProjMat)
+	public static void setDhProjectionMatrix(DhApiMat4f updateMatrix, DhApiMat4f mcProjMat)
 	{
 		// in James' testing a near clip plane distance of 2 blocks is enough to allow the fragment
 		// culling to take effect instead of seeing the near clip plane.
@@ -79,21 +89,35 @@ public class RenderUtil
 			nearClipDist = Math.min(nearClipDist, 7.5f);
 		}
 		
-		float farClipDist = (float) RenderUtil.getFarClipPlaneDistanceInBlocks();
+		float farClipDist = RenderUtil.getFarClipPlaneDistanceInBlocks();
 		
 		// Create a copy of the current matrix, so it won't be modified.
-		Mat4f lodProj = new Mat4f(mcProjMat);
+		updateMatrix.set(mcProjMat);
+		
+		
 		// Set new far and near clip plane values.
-		lodProj.setClipPlanes(nearClipDist, farClipDist);
-		return lodProj;
+		if (RENDER_API_DEF.getRenderDepth() == EDhRenderDepth.FORWARD_Z)
+		{
+			setClipPlanes(updateMatrix, nearClipDist, farClipDist, false);
+		}
+		else
+		{
+			setClipPlanes(updateMatrix, farClipDist, nearClipDist, true);
+		}
 	}
 	
-	/** create and return a new projection matrix based on MC's modelView and projection matrices */
-	public static Mat4f createLodModelViewMatrix(DhApiMat4f mcModelViewMat)
+	/**
+	 * Changes the values that store the clipping planes.
+	 * Formula for calculating matrix values is the same that OpenGL uses when making matrices.
+	 *
+	 * @param nearClip New near clipping plane value.
+	 * @param farClip New far clipping plane value.
+	 */
+	public static void setClipPlanes(DhApiMat4f matrix, float nearClip, float farClip, boolean zZeroToOne)
 	{
-		// nothing beyond copying needs to be done to MC's MVM currently,
-		// this method is just here in case that changes in the future
-		return new Mat4f(mcModelViewMat);
+		// formula copied JOML's implementation to match Minecraft
+		matrix.m22 = (zZeroToOne ? farClip : farClip + nearClip) / (nearClip - farClip);
+		matrix.m23 = (zZeroToOne ? farClip : farClip + farClip) * nearClip / (nearClip - farClip);
 	}
 	
 	//endregion
@@ -115,7 +139,16 @@ public class RenderUtil
 			// At low render distances this hides the vanilla RD border
 			
 			int chunkRenderDistance = MC_RENDER.getRenderDistance();
-			if (chunkRenderDistance <= 2)
+			
+			if (IRIS_ACCESSOR != null
+				&& IRIS_ACCESSOR.isShaderPackInUse())
+			{
+				// shaders handle the near clip plane/overdraw differently, best to play it
+				// safe and have the plane really close otherwise
+				// there might be cutouts on the screen edges
+				overdraw = 0.2f;
+			}
+			else if (chunkRenderDistance <= 2)
 			{
 				overdraw = 0.2f;
 			}
@@ -146,7 +179,7 @@ public class RenderUtil
 		
 		if (Config.Client.Advanced.Graphics.Culling.reduceOverdrawWithFastMovement.get())
 		{
-			double avgSpeed = ClientApi.INSTANCE.cameraSpeedRollingAverage.getAverage();
+			double avgSpeed = ClientApi.INSTANCE.getAvgCameraSpeed();
 			if (avgSpeed >= DynamicOverdraw.MIN_SPEED)
 			{
 				// if the player is moving fast enough,
@@ -170,6 +203,9 @@ public class RenderUtil
 		int chunkRenderDistance = MC_RENDER.getRenderDistance();
 		int vanillaBlockRenderedDistance = chunkRenderDistance * LodUtil.CHUNK_WIDTH;
 		
+		// Note: setting this to a number lower than 1.0 (ie 1 block)
+		// can cause distant clouds to flash due to depth buffer precision loss.
+		// This is not an issue when using Reverse Z depth.
 		float nearClipPlane;
 		if (Config.Client.Advanced.Debugging.lodOnlyMode.get())
 		{
@@ -245,12 +281,31 @@ public class RenderUtil
 	
 	//region
 	
-	public static int getFarClipPlaneDistanceInBlocks()
+	public static float getFarClipPlaneDistanceInBlocks()
 	{
-		int lodChunkDist = Config.Client.Advanced.Graphics.Quality.lodChunkRenderDistanceRadius.get();
-		int lodBlockDist = lodChunkDist * LodUtil.CHUNK_WIDTH;
-		// * 2 to prevent clipping when high above the world
-		return (lodBlockDist + LodUtil.REGION_WIDTH) * 2;
+		if (IRIS_ACCESSOR != null)
+		{
+			// Iris doesn't use the far clip plane DH generates, instead
+			// they use a manually generated one, which causes problems.
+			// This is a hack so DH's far clip plane matches up with what Iris thinks it is,
+			// fixing projection/depth mapping.
+			// https://github.com/IrisShaders/Iris/issues/2534
+			
+			int lodChunkDist = DhApi.Delayed.configs.graphics().chunkRenderDistance().getValue();
+			int lodBlockDist = lodChunkDist * 16; /* 16 = chunk width in blocks */
+			// sqrt 2 to prevent the corners from being cut off
+			return (float) ((lodBlockDist + 512 /* 512 = region width in blocks */) * Math.sqrt(2));
+		}
+		else
+		{
+			// Current DH logic
+			// uses a farther depth to help when far above the world
+			
+			int lodChunkDist = Config.Client.Advanced.Graphics.Quality.lodChunkRenderDistanceRadius.get();
+			int lodBlockDist = lodChunkDist * LodUtil.CHUNK_WIDTH;
+			// * 2 to prevent clipping when high above the world
+			return (lodBlockDist + LodUtil.REGION_WIDTH) * 2;
+		}
 	}
 	
 	//endregion

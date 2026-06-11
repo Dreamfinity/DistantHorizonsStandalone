@@ -17,7 +17,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.seibel.distanthorizons.core.generation;
+package com.seibel.distanthorizons.core.generation.queues;
 
 import com.seibel.distanthorizons.core.generation.tasks.DataSourceRetrievalResult;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
@@ -42,6 +42,8 @@ import java.util.concurrent.CompletableFuture;
  * Used by both world gen and server networking.
  * 
  * @see LodQuadTree
+ * @see AbstractLodRequestState
+ * @see LodRequestModule
  */
 public interface IFullDataSourceRetrievalQueue extends Closeable
 {
@@ -62,6 +64,12 @@ public interface IFullDataSourceRetrievalQueue extends Closeable
 	 * IE 0 = Block, 1 = 2x2 blocks, etc.
 	 */
 	byte highestDataDetail();
+	
+	/** 
+	 * Returns a value like "downloading" or "generating" depending on how the LODs are being retrieved.
+	 * Used to make the progress message easier to understand.
+	 */
+	String getRetrievalTypeName();
 	
 	//endregion
 	

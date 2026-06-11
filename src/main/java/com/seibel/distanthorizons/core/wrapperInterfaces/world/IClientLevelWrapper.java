@@ -20,6 +20,7 @@
 package com.seibel.distanthorizons.core.wrapperInterfaces.world;
 
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
 import org.jetbrains.annotations.Nullable;
@@ -29,14 +30,21 @@ import java.awt.*;
 public interface IClientLevelWrapper extends ILevelWrapper
 {
 	
+	/** used to track when this level was last used for Immersive portals support */
+	void markAccessed();
+	
 	@Nullable
 	IServerLevelWrapper tryGetServerSideWrapper();
 	
-	int getBlockColor(DhBlockPos pos, IBiomeWrapper biome, FullDataSourceV2 fullDataSource, IBlockStateWrapper blockState);
+	default int getBlockColor(DhBlockPos pos, IBiomeWrapper biome, FullDataSourceV2 fullDataSource, IBlockStateWrapper blockState) 
+	{ return this.getBlockColor(pos, biome, fullDataSource, blockState, true); }
+	int getBlockColor(DhBlockPos pos, IBiomeWrapper biome, FullDataSourceV2 fullDataSource, IBlockStateWrapper blockState, boolean allowApiOverride);
 	/** @return -1 if there was a problem getting the color */
 	int getDirtBlockColor();
 	void clearBlockColorCache();
 	
 	Color getCloudColor(float tickDelta);
+	
+	float getShade(EDhDirection lodDirection);
 	
 }
