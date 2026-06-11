@@ -63,7 +63,6 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapp
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
 
 import java.io.File;
 import java.util.*;
@@ -686,34 +685,7 @@ public class ClientApi
 	// keyboard //
 	//==========//
 	//region keyboard
-	
-	/** Trigger once on key press, with CLIENT PLAYER. */
-	public void keyPressedEvent(int glfwKey)
-	{
-		if (!Config.Client.Advanced.Debugging.enableDebugKeybindings.get())
-		{
-			// keybindings are disabled
-			return;
-		}
-		
-		
-		if (glfwKey == GLFW.GLFW_KEY_F6)
-		{
-			Config.Client.Advanced.Debugging.rendererMode.set(EDhApiRendererMode.next(Config.Client.Advanced.Debugging.rendererMode.get()));
-			MC_CLIENT.sendChatMessage("F6: Set rendering to " + Config.Client.Advanced.Debugging.rendererMode.get());
-		}
-		else if (glfwKey == GLFW.GLFW_KEY_F7)
-		{
-			Config.Client.Advanced.Debugging.lodOnlyMode.set(!Config.Client.Advanced.Debugging.lodOnlyMode.get());
-			MC_CLIENT.sendChatMessage("F7: Set LOD only mode to " + Config.Client.Advanced.Debugging.lodOnlyMode.get());
-		}
-		else if (glfwKey == GLFW.GLFW_KEY_F8)
-		{
-			Config.Client.Advanced.Debugging.debugRenderingColors.set(EDhApiDebugRendering.next(Config.Client.Advanced.Debugging.debugRenderingColors.get()));
-			MC_CLIENT.sendChatMessage("F8: Set debug mode to " + Config.Client.Advanced.Debugging.debugRenderingColors.get());
-		}
-	}
-	
+
 	//endregion
 	
 	
