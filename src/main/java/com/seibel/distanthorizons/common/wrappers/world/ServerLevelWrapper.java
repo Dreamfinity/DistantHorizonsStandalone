@@ -15,6 +15,7 @@
 
 package com.seibel.distanthorizons.common.wrappers.world;
 
+import java.awt.Color;
 import java.io.File;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,7 +24,11 @@ import net.minecraft.world.WorldServer;
 import org.jetbrains.annotations.Nullable;
 
 import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiLevelType;
+import com.seibel.distanthorizons.api.interfaces.block.IDhApiBiomeWrapper;
+import com.seibel.distanthorizons.api.interfaces.block.IDhApiBlockStateWrapper;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiCustomRenderRegister;
+import com.seibel.distanthorizons.api.objects.DhApiResult;
+import com.seibel.distanthorizons.api.objects.data.IDhApiFullDataSource;
 import com.seibel.distanthorizons.core.level.IDhLevel;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
@@ -152,6 +157,18 @@ public class ServerLevelWrapper implements IServerLevelWrapper {
 
         return this.dhLevel.getSaveStructure()
             .getSaveFolder(this);
+    }
+
+    @Override
+    public DhApiResult<Color> getBlockColorPreApi(
+        IDhApiBlockStateWrapper blockStateWrapper,
+        IDhApiBiomeWrapper biomeWrapper,
+        int blockWorldPosX,
+        int blockWorldPosY,
+        int blockWorldPosZ,
+        IDhApiFullDataSource dataSource)
+    {
+        return DhApiResult.createFail("Server levels don't have block color data.");
     }
 
     // ================//

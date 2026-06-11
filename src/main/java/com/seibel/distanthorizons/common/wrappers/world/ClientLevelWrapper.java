@@ -4,8 +4,11 @@ import java.awt.Color;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -16,8 +19,11 @@ import com.seibel.distanthorizons.api.interfaces.block.IDhApiBlockStateWrapper;
 import com.seibel.distanthorizons.api.objects.DhApiResult;
 import com.seibel.distanthorizons.api.objects.data.IDhApiFullDataSource;
 import com.seibel.distanthorizons.common.wrappers.minecraft.AbstractMinecraftSharedWrapper;
+import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPosMutable;
+import com.seibel.distanthorizons.core.util.TimerUtil;
+import com.seibel.distanthorizons.core.world.AbstractDhWorld;
 import com.seibel.distanthorizons.coreapi.util.ColorUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
@@ -64,8 +70,16 @@ public class ClientLevelWrapper implements IClientLevelWrapper {
 
     private BlockStateWrapper dirtBlockWrapper;
     private IDhLevel dhLevel;
+    private volatile long lastAccessTime = System.currentTimeMillis();
 
     private static final ThreadLocal<DhBlockPosMutable> MUTABLE_BLOCK_POS_THREAD_LOCAL = ThreadLocal.withInitial(DhBlockPosMutable::new);
+    private static final Timer CLIENT_CLEANUP_TIMER = TimerUtil.CreateTimer("ClientLevelTickCleanup");
+    private static final TimerTask CLIENT_CLEANUP_TASK = TimerUtil.createTimerTask(ClientLevelWrapper::tickCleanup);
+    private static final long INACTIVE_TIME_BEFORE_UNLOADED_IN_MS = 30 * 1000;
+
+    static {
+        CLIENT_CLEANUP_TIMER.scheduleAtFixedRate(CLIENT_CLEANUP_TASK, 0, 1000 / 20);
+    }
 
     // =============//
     // constructor //
@@ -91,8 +105,21 @@ public class ClientLevelWrapper implements IClientLevelWrapper {
             }
 
             // used if the client is connected to a server that defines the currently loaded level
-            IServerKeyedClientLevel overrideLevel = KEYED_CLIENT_LEVEL_MANAGER.getServerKeyedLevel();
+            IServerKeyedClientLevel overrideLevel = KEYED_CLIENT_LEVEL_MANAGER.getServerKeyedLevel(getWrapper(level, true));
             if (overrideLevel != null) {
+                WeakReference<ClientLevelWrapper> wrapperRef = LEVEL_WRAPPER_BY_CLIENT_LEVEL.get(level);
+                if (wrapperRef != null && wrapperRef.get() != overrideLevel) {
+                    ClientLevelWrapper wrapper = wrapperRef.get();
+                    if (wrapper != null) {
+                        wrapper.tryUnloadFromWorld();
+                    }
+                    wrapperRef = null;
+                }
+
+                if (wrapperRef == null && overrideLevel instanceof ClientLevelWrapper) {
+                    LEVEL_WRAPPER_BY_CLIENT_LEVEL.put(level, new WeakReference<>((ClientLevelWrapper) overrideLevel));
+                }
+
                 return overrideLevel;
             }
         }
@@ -110,8 +137,44 @@ public class ClientLevelWrapper implements IClientLevelWrapper {
     }
 
     @Override
-    public void markAccessed() {
+    public synchronized void markAccessed() {
+        this.lastAccessTime = System.currentTimeMillis();
+    }
 
+    public synchronized long getLastAccessTime() {
+        return this.lastAccessTime;
+    }
+
+    public static void tickCleanup() {
+        WorldClient clientLevel = MINECRAFT.theWorld;
+        if (clientLevel == null) {
+            return;
+        }
+
+        long currentTime = System.currentTimeMillis();
+        ArrayList<ClientLevelWrapper> levelsToUnload = new ArrayList<>();
+
+        synchronized (LEVEL_WRAPPER_BY_CLIENT_LEVEL) {
+            for (WeakReference<ClientLevelWrapper> ref : LEVEL_WRAPPER_BY_CLIENT_LEVEL.values()) {
+                ClientLevelWrapper wrapper = ref.get();
+                if (wrapper != null && wrapper.level != clientLevel) {
+                    long inactiveTimeMs = currentTime - wrapper.getLastAccessTime();
+                    if (inactiveTimeMs > INACTIVE_TIME_BEFORE_UNLOADED_IN_MS) {
+                        levelsToUnload.add(wrapper);
+                    }
+                }
+            }
+        }
+
+        for (ClientLevelWrapper wrapper : levelsToUnload) {
+            synchronized (wrapper) {
+                long inactiveTimeMs = currentTime - wrapper.getLastAccessTime();
+                if (wrapper.level != clientLevel && inactiveTimeMs > INACTIVE_TIME_BEFORE_UNLOADED_IN_MS) {
+                    LOGGER.debug("Unloading level [" + wrapper.getDhIdentifier() + "] due to inactivity");
+                    wrapper.tryUnloadFromWorld();
+                }
+            }
+        }
     }
 
     @Nullable
@@ -259,6 +322,13 @@ public class ClientLevelWrapper implements IClientLevelWrapper {
     @Override
     public WorldClient getWrappedMcObject() {
         return this.level;
+    }
+
+    private void tryUnloadFromWorld() {
+        AbstractDhWorld world = SharedApi.getAbstractDhWorld();
+        if (world == null || !world.unloadLevel(this)) {
+            this.onUnload();
+        }
     }
 
     @Override

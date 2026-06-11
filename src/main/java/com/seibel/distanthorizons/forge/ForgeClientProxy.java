@@ -16,21 +16,18 @@
 package com.seibel.distanthorizons.forge;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.shader.Framebuffer;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.event.world.WorldEvent;
 
 import com.seibel.distanthorizons.MixinFlags;
 import com.seibel.distanthorizons.common.AbstractModInitializer;
 import com.seibel.distanthorizons.common.render.openGl.GlDhRenderApiDefinition;
 import com.seibel.distanthorizons.common.util.ProxyUtil;
 import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
-import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
 import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
@@ -38,7 +35,6 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.logging.f3.F3Screen;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -58,10 +54,6 @@ public class ForgeClientProxy implements AbstractModInitializer.IEventProxy {
     private static final IMinecraftClientWrapper MC = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
     private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 
-    private static World GetEventLevel(WorldEvent e) {
-        return e.world;
-    }
-
     @Override
     public void registerEvents() {
         MinecraftForge.EVENT_BUS.register(this);
@@ -72,39 +64,6 @@ public class ForgeClientProxy implements AbstractModInitializer.IEventProxy {
 
         GlDhRenderApiDefinition renderDefinition = new GlDhRenderApiDefinition();
         renderDefinition.bindRenderers();
-    }
-
-    // ==============//
-    // world events //
-    // ==============//
-
-    @SubscribeEvent
-    public void clientLevelLoadEvent(WorldEvent.Load event) {
-        LOGGER.info("level load");
-
-        World level = event.world;
-        if (!(level instanceof WorldClient)) {
-            return;
-        }
-
-        WorldClient clientLevel = (WorldClient) level;
-        IClientLevelWrapper clientLevelWrapper = ClientLevelWrapper.getWrapper(clientLevel, true);
-        // TODO this causes a crash due to level being set to null somewhere
-        ClientApi.INSTANCE.clientLevelLoadEvent(clientLevelWrapper);
-    }
-
-    @SubscribeEvent
-    public void clientLevelUnloadEvent(WorldEvent.Unload event) {
-        LOGGER.info("level unload");
-
-        World level = event.world;
-        if (!(level instanceof WorldClient)) {
-            return;
-        }
-
-        WorldClient clientLevel = (WorldClient) level;
-        IClientLevelWrapper clientLevelWrapper = ClientLevelWrapper.getWrapper(clientLevel);
-        ClientApi.INSTANCE.clientLevelUnloadEvent(clientLevelWrapper);
     }
 
     // ==============//
