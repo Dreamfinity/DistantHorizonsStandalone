@@ -2,6 +2,7 @@ package com.seibel.distanthorizons;
 
 import java.nio.FloatBuffer;
 
+import com.seibel.distanthorizons.core.util.math.DhMat4f;
 import net.minecraft.client.Minecraft;
 
 import org.joml.Matrix4f;
@@ -13,7 +14,6 @@ import com.seibel.distanthorizons.common.wrappers.McObjectConverter;
 import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
 import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.forge.ForgeMain;
 
 public class RenderHelper {
@@ -91,11 +91,11 @@ public class RenderHelper {
         return new Matrix4f(projectionMatrix);
     }
 
-    public static Mat4f getModelViewMatrix() {
+    public static DhMat4f getModelViewMatrix() {
         return McObjectConverter.Convert(modelViewMatrix);
     }
 
-    public static Mat4f getProjectionMatrix() {
+    public static DhMat4f getProjectionMatrix() {
         return McObjectConverter.Convert(projectionMatrix);
     }
 

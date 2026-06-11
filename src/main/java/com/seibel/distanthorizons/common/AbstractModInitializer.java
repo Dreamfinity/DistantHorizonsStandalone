@@ -3,6 +3,7 @@ package com.seibel.distanthorizons.common;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import com.seibel.distanthorizons.core.Initializer;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.dedicated.DedicatedServer;
 
@@ -125,7 +126,7 @@ public abstract class AbstractModInitializer {
 
     private void startup() {
         DependencySetup.createSharedBindings();
-        SharedApi.init();
+        Initializer.preConfigInit();
         this.createInitialBindings();
     }
 

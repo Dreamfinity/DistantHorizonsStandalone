@@ -152,11 +152,13 @@ public class MinecraftGLWrapper {
 
     /**
      * Always binds to {@link GL32#GL_TEXTURE_2D}
-     * 
+     *
      * @see GL32#glBindTexture(int, int)
      */
     public void glBindTexture(int texture) {
         GL32.glBindTexture(GL32.GL_TEXTURE_2D, texture);
     }
+
+    public int getActiveDepthFunc() { return GL32.glGetInteger(GL32.GL_DEPTH_FUNC); }
 
 }

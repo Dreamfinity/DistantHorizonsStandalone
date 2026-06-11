@@ -233,7 +233,7 @@ public class WrapperFactory implements IWrapperFactory {
 
     @Override
     public IDhGenericRenderer createGenericRenderer() {
-        return GlGenericObjectRenderer.INSTANCE;
+        return new GlGenericObjectRenderer();
     }
 
     /**

@@ -17,6 +17,8 @@ package com.seibel.distanthorizons.common.wrappers.minecraft;
 
 import java.io.File;
 
+import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.multiplayer.ServerData;
@@ -24,6 +26,8 @@ import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.profiler.Profiler;
 import net.minecraft.util.ChatComponentText;
 
+import net.minecraft.world.WorldServer;
+import net.minecraftforge.common.DimensionManager;
 import org.jetbrains.annotations.Nullable;
 
 import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
@@ -43,7 +47,7 @@ import com.seibel.distanthorizons.coreapi.ModInfo;
  *
  * @author James Seibel
  */
-public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecraftSharedWrapper {
+public class MinecraftClientWrapper extends AbstractMinecraftSharedWrapper implements IMinecraftClientWrapper, IMinecraftSharedWrapper {
 
     private static final DhLogger LOGGER = new DhLoggerBuilder().build();
     private static final Minecraft MINECRAFT = Minecraft.getMinecraft();
@@ -219,6 +223,11 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
     }
 
     @Override
+    public void showDialog(String title, String message, String dialogType, String iconType) {
+        LOGGER.error("Dialog not implemented {} {}!", title, message);
+    }
+
+    @Override
     public Object getOptionsObject() {
         return new Object();
     }
@@ -242,6 +251,25 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
             return MINECRAFT.getIntegratedServer()
                 .getCurrentPlayerCount();
         }
+    }
+
+    @Nullable
+    @Override
+    public IServerLevelWrapper getLevelWrapper(String dimensionResourceLocation)
+    {
+        if (!this.hasSinglePlayerServer())
+        {
+            return null;
+        }
+
+
+        Integer dimensionKey = this.deserializeDimensionResourceKey(dimensionResourceLocation);
+        if (dimensionKey == null || MINECRAFT.getIntegratedServer() == null)
+        {
+            return null;
+        }
+        WorldServer mcLevel = DimensionManager.getWorld(dimensionKey);
+        return ServerLevelWrapper.getWrapper(mcLevel);
     }
 
 }

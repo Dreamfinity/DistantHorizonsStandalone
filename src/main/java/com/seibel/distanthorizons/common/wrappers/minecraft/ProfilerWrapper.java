@@ -31,10 +31,15 @@ public class ProfilerWrapper implements IProfilerWrapper {
         this.profiler = profiler;
     }
 
-    /** starts a new section inside the currently running section */
+    /**
+     * starts a new section inside the currently running section
+     *
+     * @return
+     */
     @Override
-    public void push(String newSection) {
+    public IProfileBlock push(String newSection) {
         profiler.startSection(newSection);
+        return new ProfileBlock(this.profiler);
     }
 
     /** ends the currently running section and starts a new one */
@@ -43,10 +48,20 @@ public class ProfilerWrapper implements IProfilerWrapper {
         profiler.endStartSection(newSection);
     }
 
-    /** ends the currently running section */
-    @Override
-    public void pop() {
-        profiler.endSection();
+    public static class ProfileBlock implements IProfileBlock
+    {
+        public Profiler profiler;
+
+        public ProfileBlock(Profiler newProfiler)
+        {
+            this.profiler = newProfiler;
+        }
+
+        @Override
+        public void close()
+        {
+            this.profiler.endSection();
+        }
     }
 
 }

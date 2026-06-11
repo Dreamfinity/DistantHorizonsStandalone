@@ -10,6 +10,15 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
+import com.seibel.distanthorizons.api.enums.config.EDhApiLodShading;
+import com.seibel.distanthorizons.api.interfaces.block.IDhApiBiomeWrapper;
+import com.seibel.distanthorizons.api.interfaces.block.IDhApiBlockStateWrapper;
+import com.seibel.distanthorizons.api.objects.DhApiResult;
+import com.seibel.distanthorizons.api.objects.data.IDhApiFullDataSource;
+import com.seibel.distanthorizons.common.wrappers.minecraft.AbstractMinecraftSharedWrapper;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPosMutable;
+import com.seibel.distanthorizons.coreapi.util.ColorUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.util.Vec3;
@@ -37,6 +46,8 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
 
+import com.seibel.distanthorizons.core.enums.EDhDirection;
+
 public class ClientLevelWrapper implements IClientLevelWrapper {
 
     private static final DhLogger LOGGER = new DhLoggerBuilder().build();
@@ -53,6 +64,8 @@ public class ClientLevelWrapper implements IClientLevelWrapper {
 
     private BlockStateWrapper dirtBlockWrapper;
     private IDhLevel dhLevel;
+
+    private static final ThreadLocal<DhBlockPosMutable> MUTABLE_BLOCK_POS_THREAD_LOCAL = ThreadLocal.withInitial(DhBlockPosMutable::new);
 
     // =============//
     // constructor //
@@ -94,6 +107,11 @@ public class ClientLevelWrapper implements IClientLevelWrapper {
         ClientLevelWrapper wrapper = new ClientLevelWrapper(level);
         LEVEL_WRAPPER_BY_CLIENT_LEVEL.put(level, new WeakReference<>(wrapper));
         return wrapper;
+    }
+
+    @Override
+    public void markAccessed() {
+
     }
 
     @Nullable
@@ -151,7 +169,7 @@ public class ClientLevelWrapper implements IClientLevelWrapper {
 
     @Override
     public int getBlockColor(DhBlockPos pos, IBiomeWrapper biome, FullDataSourceV2 fullDataSource,
-        IBlockStateWrapper blockWrapper) {
+        IBlockStateWrapper blockWrapper, boolean allowApiOverride) {
         final ClientBlockStateColorCache blockColorCache = this.blockCache
             .computeIfAbsent(((BlockStateWrapper) blockWrapper).blockState, cachedBlockColorCacheFunction);
 
@@ -269,6 +287,45 @@ public class ClientLevelWrapper implements IClientLevelWrapper {
             .getSaveFolder(this);
     }
 
+    @Override
+    public DhApiResult<Color> getBlockColorPreApi(
+        IDhApiBlockStateWrapper blockStateWrapper,
+        IDhApiBiomeWrapper biomeWrapper,
+        int blockWorldPosX, int blockWorldPosY, int blockWorldPosZ,
+        IDhApiFullDataSource dataSource)
+    {
+        // cast to core objects //
+        //region
+
+        if(!(blockStateWrapper instanceof IBlockStateWrapper coreBlockStateWrapper))
+        {
+            return DhApiResult.createFail("Unable to cast ["+blockStateWrapper.getClass()+"] to ["+IBlockStateWrapper.class+"]");
+        }
+
+        if(!(biomeWrapper instanceof IBiomeWrapper coreBiomeWrapper))
+        {
+            return DhApiResult.createFail("Unable to cast ["+biomeWrapper.getClass()+"] to ["+IBiomeWrapper.class+"]");
+        }
+
+        if(!(dataSource instanceof FullDataSourceV2 coreDataSource))
+        {
+            return DhApiResult.createFail("Unable to cast ["+dataSource.getClass()+"] to ["+FullDataSourceV2.class+"]");
+        }
+
+        //endregion
+
+
+
+        // use a mutable thread local to reduce allocations slightly
+        DhBlockPosMutable blockWorldPos = MUTABLE_BLOCK_POS_THREAD_LOCAL.get();
+        blockWorldPos.setX(blockWorldPosX);
+        blockWorldPos.setY(blockWorldPosY);
+        blockWorldPos.setZ(blockWorldPosZ);
+
+        int color = this.getBlockColor(blockWorldPos, coreBiomeWrapper, coreDataSource, coreBlockStateWrapper, false);
+        return DhApiResult.createSuccess(ColorUtil.toColorObjARGB(color));
+    }
+
     // ===================//
     // generic rendering //
     // ===================//
@@ -301,4 +358,32 @@ public class ClientLevelWrapper implements IClientLevelWrapper {
         return "Wrapped{" + this.level.toString() + "@" + this.getDhIdentifier() + "}";
     }
 
+    @Override
+    public float getShade(EDhDirection lodDirection)
+    {
+        EDhApiLodShading lodShading = Config.Client.Advanced.Graphics.Quality.lodShading.get();
+        switch (lodShading)
+        {
+            default:
+            case AUTO:
+            case ENABLED:
+                switch (lodDirection)
+                {
+                    case DOWN:
+                        return 0.5F;
+                    default:
+                    case UP:
+                        return 1.0F;
+                    case NORTH:
+                    case SOUTH:
+                        return 0.8F;
+                    case WEST:
+                    case EAST:
+                        return 0.6F;
+                }
+
+            case DISABLED:
+                return 1.0F;
+        }
+    }
 }

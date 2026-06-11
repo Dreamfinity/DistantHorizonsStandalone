@@ -17,6 +17,7 @@ package com.seibel.distanthorizons.common.wrappers;
 
 import java.nio.FloatBuffer;
 
+import com.seibel.distanthorizons.core.util.math.DhMat4f;
 import net.minecraftforge.common.util.ForgeDirection;
 
 import org.joml.Matrix4f;
@@ -25,7 +26,6 @@ import com.gtnewhorizon.gtnhlib.blockpos.BlockPos;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.pos.DhChunkPos;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
-import com.seibel.distanthorizons.core.util.math.Mat4f;
 
 import copy.com.gtnewhorizons.angelica.compat.mojang.ChunkPos;
 
@@ -44,10 +44,10 @@ public class McObjectConverter {
 
     /** 4x4 float matrix converter */
     @Deprecated
-    public static Mat4f Convert(Matrix4f mcMatrix) {
+    public static DhMat4f Convert(Matrix4f mcMatrix) {
         FloatBuffer buffer = FloatBuffer.allocate(16);
         storeMatrix(mcMatrix, buffer);
-        Mat4f matrix = new Mat4f(buffer);
+        DhMat4f matrix = new DhMat4f(buffer);
         // TODO ? matrix.transpose();
         return matrix;
     }

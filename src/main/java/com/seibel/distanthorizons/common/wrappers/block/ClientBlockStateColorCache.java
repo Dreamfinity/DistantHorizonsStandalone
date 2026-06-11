@@ -21,6 +21,7 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.seibel.distanthorizons.coreapi.util.ColorUtil;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockBush;
 import net.minecraft.block.BlockFlower;
@@ -38,7 +39,6 @@ import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
-import com.seibel.distanthorizons.core.util.ColorUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.forge.ForgeMain;
 
@@ -49,7 +49,6 @@ import cpw.mods.fml.common.FMLLog;
  * the given BlockState should have based
  * on the given {@link IClientLevelWrapper}.
  *
- * @see ColorUtil
  */
 public class ClientBlockStateColorCache {
 

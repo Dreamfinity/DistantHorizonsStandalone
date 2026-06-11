@@ -17,6 +17,10 @@ package com.seibel.distanthorizons.common.wrappers.minecraft;
 
 import java.awt.Color;
 
+import com.seibel.distanthorizons.api.enums.config.EDhApiRenderingApi;
+import com.seibel.distanthorizons.common.wrappers.misc.LightMapWrapper;
+import com.seibel.distanthorizons.core.util.math.DhVec3d;
+import com.seibel.distanthorizons.core.util.math.DhVec3f;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.shader.Framebuffer;
 import net.minecraft.potion.Potion;
@@ -31,8 +35,6 @@ import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.util.math.Vec3d;
-import com.seibel.distanthorizons.core.util.math.Vec3f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
@@ -72,9 +74,9 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper {
     public int finalLevelFrameBufferId = -1;
 
     @Override
-    public Vec3f getLookAtVector() {
+    public DhVec3f getLookAtVector() {
         Vec3 look = MC.renderViewEntity.getLookVec();
-        return new Vec3f((float) look.xCoord, (float) look.yCoord, (float) look.zCoord);
+        return new DhVec3f((float) look.xCoord, (float) look.yCoord, (float) look.zCoord);
     }
 
     @Override
@@ -92,12 +94,12 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper {
     }
 
     @Override
-    public Vec3d getCameraExactPosition() {
+    public DhVec3d getCameraExactPosition() {
         float frameTime = ((IMixinMinecraft) Minecraft.getMinecraft()).getTimer().renderPartialTicks;
         Camera camera = new Camera(MC.renderViewEntity, frameTime);
         Vector3d projectedView = camera.getPos();
 
-        return new Vec3d(projectedView.x, projectedView.y, projectedView.z);
+        return new DhVec3d(projectedView.x, projectedView.y, projectedView.z);
     }
 
     @Override
@@ -127,11 +129,6 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper {
         } else {
             return new Color(0, 0, 0);
         }
-    }
-
-    @Override
-    public double getFov(float partialTicks) {
-        return MC.gameSettings.fovSetting;
     }
 
     /** Measured in chunks */
@@ -169,6 +166,11 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper {
     }
 
     @Override
+    public EDhApiRenderingApi getMcRenderingApi() {
+        return EDhApiRenderingApi.OPEN_GL;
+    }
+
+    @Override
     public int getTargetFramebuffer() {
         return Minecraft.getMinecraft()
             .getFramebuffer().framebufferObject;
@@ -180,7 +182,7 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper {
     }
 
     @Override
-    public int getDepthTextureId() {
+    public int getGlDepthTextureId() {
         final Framebuffer framebuffer = Minecraft.getMinecraft()
             .getFramebuffer();
 
@@ -192,7 +194,7 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper {
     }
 
     @Override
-    public int getColorTextureId() {
+    public int getGlColorTextureId() {
         int texture = Minecraft.getMinecraft()
             .getFramebuffer().framebufferTexture;
         return texture;
@@ -201,32 +203,6 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper {
     @Override
     public ILightMapWrapper getLightmapWrapper(ILevelWrapper level) {
         return new LightMapWrapper();
-    }
-
-    @Override
-    public float getShade(EDhDirection lodDirection) {
-        EDhApiLodShading lodShading = Config.Client.Advanced.Graphics.Quality.lodShading.get();
-        switch (lodShading) {
-            default:
-            case AUTO:
-            case ENABLED:
-                switch (lodDirection) {
-                    case DOWN:
-                        return 0.5F;
-                    default:
-                    case UP:
-                        return 1.0F;
-                    case NORTH:
-                    case SOUTH:
-                        return 0.8F;
-                    case WEST:
-                    case EAST:
-                        return 0.6F;
-                }
-
-            case DISABLED:
-                return 1.0F;
-        }
     }
 
     @Override
