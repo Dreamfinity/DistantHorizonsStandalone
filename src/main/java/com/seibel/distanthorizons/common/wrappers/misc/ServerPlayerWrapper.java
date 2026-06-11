@@ -3,7 +3,6 @@ package com.seibel.distanthorizons.common.wrappers.misc;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 
-import com.seibel.distanthorizons.core.util.math.DhVec3d;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.world.WorldServer;
@@ -11,6 +10,7 @@ import net.minecraft.world.WorldServer;
 import com.google.common.base.Objects;
 import com.google.common.collect.MapMaker;
 import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
+import com.seibel.distanthorizons.core.util.math.DhVec3d;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
 

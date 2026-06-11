@@ -76,9 +76,10 @@ public class KeyedClientLevelManager implements IKeyedClientLevelManager {
 
         synchronized (this.keyedLevelsCache) {
             this.keyedLevelsCache.keySet()
-                .removeIf(level -> ClientLevelWrapper.getWrapper(level, true)
-                    .getDimensionName()
-                    .equals(dimensionResource));
+                .removeIf(
+                    level -> ClientLevelWrapper.getWrapper(level, true)
+                        .getDimensionName()
+                        .equals(dimensionResource));
         }
 
         if (clientLevel == null || !clientLevel.getDimensionName()

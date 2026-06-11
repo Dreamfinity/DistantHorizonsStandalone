@@ -2,14 +2,15 @@ package com.seibel.distanthorizons.common.wrappers.minecraft;
 
 import java.io.File;
 
-import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
 import net.minecraft.server.dedicated.DedicatedServer;
-
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.DimensionManager;
+
 import org.jetbrains.annotations.Nullable;
+
+import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
 
 // @Environment(EnvType.SERVER)
 public class MinecraftServerWrapper extends AbstractMinecraftSharedWrapper implements IMinecraftSharedWrapper {
@@ -51,14 +52,13 @@ public class MinecraftServerWrapper extends AbstractMinecraftSharedWrapper imple
 
     @Override
     public @Nullable IServerLevelWrapper getLevelWrapper(String dimensionResourceLocation) {
-        if (this.dedicatedServer == null)
-        {
-            throw new IllegalStateException("Trying to get the server mcLevel before dedicated server completed initialization!");
+        if (this.dedicatedServer == null) {
+            throw new IllegalStateException(
+                "Trying to get the server mcLevel before dedicated server completed initialization!");
         }
 
         Integer dimensionKey = this.deserializeDimensionResourceKey(dimensionResourceLocation);
-        if (dimensionKey == null)
-        {
+        if (dimensionKey == null) {
             return null;
         }
         WorldServer mcLevel = DimensionManager.getWorld(dimensionKey);

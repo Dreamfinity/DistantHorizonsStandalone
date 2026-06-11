@@ -17,10 +17,6 @@ package com.seibel.distanthorizons.common.wrappers.minecraft;
 
 import java.awt.Color;
 
-import com.seibel.distanthorizons.api.enums.config.EDhApiRenderingApi;
-import com.seibel.distanthorizons.common.wrappers.misc.LightMapWrapper;
-import com.seibel.distanthorizons.core.util.math.DhVec3d;
-import com.seibel.distanthorizons.core.util.math.DhVec3f;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.shader.Framebuffer;
 import net.minecraft.potion.Potion;
@@ -29,12 +25,13 @@ import net.minecraft.util.Vec3;
 import org.joml.Vector3d;
 import org.lwjgl.opengl.GL15;
 
-import com.seibel.distanthorizons.api.enums.config.EDhApiLodShading;
+import com.seibel.distanthorizons.api.enums.config.EDhApiRenderingApi;
 import com.seibel.distanthorizons.common.wrappers.WrapperFactory;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.enums.EDhDirection;
+import com.seibel.distanthorizons.common.wrappers.misc.LightMapWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.util.math.DhVec3d;
+import com.seibel.distanthorizons.core.util.math.DhVec3f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;

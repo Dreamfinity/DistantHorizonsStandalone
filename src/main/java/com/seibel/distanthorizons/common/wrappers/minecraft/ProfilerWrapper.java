@@ -48,18 +48,16 @@ public class ProfilerWrapper implements IProfilerWrapper {
         profiler.endStartSection(newSection);
     }
 
-    public static class ProfileBlock implements IProfileBlock
-    {
+    public static class ProfileBlock implements IProfileBlock {
+
         public Profiler profiler;
 
-        public ProfileBlock(Profiler newProfiler)
-        {
+        public ProfileBlock(Profiler newProfiler) {
             this.profiler = newProfiler;
         }
 
         @Override
-        public void close()
-        {
+        public void close() {
             this.profiler.endSection();
         }
     }

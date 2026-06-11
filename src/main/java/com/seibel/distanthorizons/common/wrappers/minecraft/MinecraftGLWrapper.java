@@ -159,6 +159,8 @@ public class MinecraftGLWrapper {
         GL32.glBindTexture(GL32.GL_TEXTURE_2D, texture);
     }
 
-    public int getActiveDepthFunc() { return GL32.glGetInteger(GL32.GL_DEPTH_FUNC); }
+    public int getActiveDepthFunc() {
+        return GL32.glGetInteger(GL32.GL_DEPTH_FUNC);
+    }
 
 }

@@ -160,14 +160,9 @@ public class ServerLevelWrapper implements IServerLevelWrapper {
     }
 
     @Override
-    public DhApiResult<Color> getBlockColorPreApi(
-        IDhApiBlockStateWrapper blockStateWrapper,
-        IDhApiBiomeWrapper biomeWrapper,
-        int blockWorldPosX,
-        int blockWorldPosY,
-        int blockWorldPosZ,
-        IDhApiFullDataSource dataSource)
-    {
+    public DhApiResult<Color> getBlockColorPreApi(IDhApiBlockStateWrapper blockStateWrapper,
+        IDhApiBiomeWrapper biomeWrapper, int blockWorldPosX, int blockWorldPosY, int blockWorldPosZ,
+        IDhApiFullDataSource dataSource) {
         return DhApiResult.createFail("Server levels don't have block color data.");
     }
 

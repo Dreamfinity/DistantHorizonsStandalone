@@ -17,7 +17,6 @@ package com.seibel.distanthorizons.common.wrappers;
 
 import java.nio.FloatBuffer;
 
-import com.seibel.distanthorizons.core.util.math.DhMat4f;
 import net.minecraftforge.common.util.ForgeDirection;
 
 import org.joml.Matrix4f;
@@ -26,6 +25,7 @@ import com.gtnewhorizon.gtnhlib.blockpos.BlockPos;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.pos.DhChunkPos;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
+import com.seibel.distanthorizons.core.util.math.DhMat4f;
 
 import copy.com.gtnewhorizons.angelica.compat.mojang.ChunkPos;
 
