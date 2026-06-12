@@ -275,7 +275,7 @@ public class ClientLevelWrapper implements IClientLevelWrapper {
     @Override
     public String getDimensionName() {
         return DimensionTypeWrapper.getDimensionTypeWrapper(this.level.provider.dimensionId)
-            .getName();
+            .getName() + ":" + this.level.provider.dimensionId;
     }
 
     @Override
