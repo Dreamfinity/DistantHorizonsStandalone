@@ -84,7 +84,7 @@ public class ForgeClientProxy implements AbstractModInitializer.IEventProxy {
                 .func_152344_a(() -> {
                     Chunk chunk = level.getChunkFromBlockCoords(event.x, event.z);
                     ChunkWrapper chunkWrapper = new ChunkWrapper(chunk, wrappedLevel);
-                    SharedApi.INSTANCE.applyChunkUpdate(chunkWrapper, wrappedLevel);
+                    SharedApi.INSTANCE.applyChunkUpdate(chunkWrapper, wrappedLevel, true);
                 });
         }
     }
@@ -107,7 +107,7 @@ public class ForgeClientProxy implements AbstractModInitializer.IEventProxy {
             return;
         }
 
-        SharedApi.INSTANCE.applyChunkUpdate(chunkWrapper, wrappedLevel);
+        SharedApi.INSTANCE.applyChunkUpdate(chunkWrapper, wrappedLevel, true);
     }
 
     // ==============//
